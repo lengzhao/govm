@@ -1,10 +1,14 @@
 # Storage Module
 
-存储模块是govm区块链平台的核心组件之一，负责数据的持久化存储。该模块基于LevelDB实现，提供高性能的键值对存储能力，并支持创建不同维度的存储实例，用于存储区块、交易、合约状态等不同类型的数据。
+存储模块是govm区块链平台的核心组件之一，负责数据的持久化存储。该模块提供了两种实现方式：
+1. 基于LevelDB的持久化存储
+2. 纯内存存储（适用于测试或特殊场景）
+
+模块提供高性能的键值对存储能力，并支持创建不同维度的存储实例，用于存储区块、交易、合约状态等不同类型的数据。
 
 ## 功能特性
 
-1. 基于LevelDB的高性能键值对存储
+1. 支持LevelDB持久化存储和内存存储两种模式
 2. 支持创建不同命名空间的存储实例
 3. 提供统一的存储接口供其他模块使用
 4. 支持批量操作以提高性能
@@ -30,7 +34,7 @@ import (
 )
 
 func main() {
-    // 创建存储实例
+    // 创建LevelDB存储实例
     store, err := storage.NewLevelDBStorage("./data", "main")
     if err != nil {
         log.Fatal(err)
@@ -57,6 +61,34 @@ func main() {
     
     fmt.Printf("Retrieved value: %s\n", string(value))
 }
+```
+
+### 内存存储示例
+
+```go
+// 创建内存存储实例
+memStore := storage.NewMemoryStorage("main")
+
+// 启动存储服务
+err := memStore.Start()
+if err != nil {
+    log.Fatal(err)
+}
+defer memStore.Stop()
+
+// 存储数据
+err = memStore.Put([]byte("key"), []byte("value"))
+if err != nil {
+    log.Fatal(err)
+}
+
+// 获取数据
+value, err := memStore.Get([]byte("key"))
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Retrieved value: %s\n", string(value))
 ```
 
 ## 接口说明
