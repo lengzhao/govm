@@ -1,5 +1,9 @@
 package storage
 
+import (
+	"github.com/syndtr/goleveldb/leveldb"
+)
+
 // Storage 基础存储接口
 type Storage interface {
 	// Start 启动存储服务
@@ -22,4 +26,35 @@ type Storage interface {
 
 	// BatchPut 批量存储键值对
 	BatchPut(pairs map[string][]byte) error
+
+	// NewStorage 创建指定命名空间的新存储实例
+	NewStorage(namespace string) (Storage, error)
+
+	// GetNamespace 获取当前存储实例的命名空间
+	GetNamespace() string
+
+	// Close 关闭当前存储实例
+	Close() error
+
+	// GetDB 获取底层LevelDB实例（仅供内部使用）
+	getDB() *leveldb.DB
+}
+
+// Storage错误码定义
+const (
+	ErrNotStarted          = "STOR001"
+	ErrNotFound            = "STOR002"
+	ErrClosed              = "STOR003"
+	ErrNamespaceConflict   = "STOR004"
+	ErrBatchPartialFailure = "STOR005"
+)
+
+// StorageError 存储错误类型
+type StorageError struct {
+	Code    string
+	Message string
+}
+
+func (e *StorageError) Error() string {
+	return "[" + e.Code + "] " + e.Message
 }

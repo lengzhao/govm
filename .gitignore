@@ -29,3 +29,6 @@ go.work
 # Build outputs
 bin/
 build/
+.cursor/
+.vscode/
+.qoder/
