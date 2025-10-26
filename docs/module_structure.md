@@ -38,11 +38,17 @@
   - 固定21个验证节点
   - 轮流出块机制（区块间隔固定为2秒）
   - 即时确认（简化版）
-- **子模块**：
-  - 验证节点管理
-  - 轮流出块调度
-  - 区块验证与确认
-  - 共识规则检查
+  - 空区块验证：验证空区块的合法性
+  - 节点管理职责分离：PoA共识模块不负责节点的注册和注销，这些功能由区块链的其他模块负责，共识模块只提供接口允许设置和替换节点列表
+- **核心接口**：
+  - `GetRound() uint64` - 获取当前轮次
+  - `GetTurn() uint64` - 获取当前轮值索引
+  - `IsValidator(addr types.Address) bool` - 检查节点是否为验证者
+  - `UpdateValidators(validators []types.Address) error` - 更新验证节点列表
+- **与其他模块的关系**：
+  - 区块生成模块调用共识模块进行区块验证
+  - 节点管理模块通过接口更新验证节点列表
+- **详细设计**：参见 [PoA共识机制详细设计文档](poa_consensus_design.md)
 
 ### 5. 区块生成模块 (generator)
 - **功能职责**：负责从交易池中获取交易并生成新区块
@@ -96,7 +102,7 @@
 
 ## 模块依赖关系
 
-```mermaid
+```
 graph TD
     A[API接口模块] --> B[区块链核心模块]
     A --> N[网络通信模块]
@@ -116,6 +122,7 @@ graph TD
     I --> H
     I --> N
     I --> G
+    J[节点管理模块] --> E
 ```
 
 ## 目录结构
@@ -124,9 +131,13 @@ graph TD
 govm/
 ├── main.go
 ├── docs/
-│   └── module_structure.md
+│   ├── module_structure.md
+│   └── poa_consensus_design.md
 ├── api/
 ├── consensus/
+│   ├── consensus.go
+│   ├── example_poa.go
+│   └── consensus_test.go
 ├── core/
 ├── crypto/
 ├── network/

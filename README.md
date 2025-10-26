@@ -86,6 +86,9 @@ graph TD
 - 固定21个验证节点
 - 轮流出块机制
 - 即时确认（简化版）
+- 空区块机制：当验证节点异常无法正常出块时，使用空区块代替，确保链的连续性
+- 节点管理职责分离：PoA共识模块不负责节点的注册和注销，这些功能由区块链的其他模块负责，共识模块只提供接口允许设置和替换节点列表
+- 详细设计文档请参见 [PoA共识机制详细设计文档](docs/poa_consensus_design.md)
 
 ## 加密模块
 
@@ -93,6 +96,8 @@ graph TD
 
 - **Ed25519签名算法**: 快速且安全的数字签名算法
 - **ECDSA签名算法**: 椭圆曲线数字签名算法
+- **Secp256k1签名算法**: 比特币标准的椭圆曲线数字签名算法
+- **Schnorr签名算法**: 比特币Taproot标准的签名算法
 - **哈希函数**: SHA256
 - **地址生成**: 从公钥生成区块链地址
 
@@ -104,9 +109,13 @@ graph TD
 govm/
 ├── main.go
 ├── docs/
-│   └── module_structure.md
+│   ├── module_structure.md
+│   └── poa_consensus_design.md
 ├── api/
 ├── consensus/
+│   ├── consensus.go
+│   ├── example_poa.go
+│   └── consensus_test.go
 ├── core/
 ├── crypto/
 │   ├── crypto.go
