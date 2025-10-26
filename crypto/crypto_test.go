@@ -139,17 +139,6 @@ func TestHash(t *testing.T) {
 	}
 }
 
-func TestKeccak256(t *testing.T) {
-	crypto := NewCrypto()
-
-	data := []byte("test data")
-	hash := crypto.Keccak256(data)
-
-	if hash == [32]byte{} {
-		t.Error("Keccak256 hash is empty")
-	}
-}
-
 func TestAddressGeneration(t *testing.T) {
 	crypto := NewCrypto()
 

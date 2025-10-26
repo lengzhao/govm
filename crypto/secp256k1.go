@@ -41,7 +41,7 @@ func (k *secp256k1PrivateKey) Sign(data []byte) ([]byte, error) {
 
 // Type returns the key type.
 func (k *secp256k1PrivateKey) Type() KeyType {
-	return "secp256k1"
+	return Secp256k1
 }
 
 // secp256k1PublicKey implements the PublicKey interface for secp256k1 keys.
@@ -91,7 +91,7 @@ func (k *secp256k1PublicKey) Verify(data []byte, signature []byte) bool {
 
 // Type returns the key type.
 func (k *secp256k1PublicKey) Type() KeyType {
-	return "secp256k1"
+	return Secp256k1
 }
 
 // GenerateSecp256k1KeyPair generates a new secp256k1 key pair.

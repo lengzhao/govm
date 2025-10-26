@@ -140,9 +140,9 @@ func main() {
     hash := c.Hash(data)
     fmt.Printf("SHA256 Hash: %x\n", hash)
     
-    // Keccak256 hash
-    keccakHash := c.Keccak256(data)
-    fmt.Printf("Keccak256 Hash: %x\n", keccakHash)
+    // Hash hash
+    keccakHash := c.Hash(data)
+    fmt.Printf("Hash Hash: %x\n", keccakHash)
 }
 ```
 
@@ -243,13 +243,11 @@ The crypto module is organized into several files:
 
 ```go
 type Crypto interface {
-    GenerateKeyPair() (PrivateKey, PublicKey, error)
-    GenerateEd25519KeyPair() (PrivateKey, PublicKey, error)
-    GenerateECDSAKeyPair() (PrivateKey, PublicKey, error)
+    GenerateKeyPair(keyType KeyType) (PrivateKey, PublicKey, error)
     Sign(data []byte, privateKey PrivateKey) ([]byte, error)
     Verify(data []byte, signature []byte, publicKey PublicKey) bool
     Hash(data []byte) types.Hash
-    Keccak256(data []byte) types.Hash
+    Hash(data []byte) types.Hash
     GenerateAddress(publicKey PublicKey) types.Address
 }
 ```
@@ -262,6 +260,7 @@ type PrivateKey interface {
     PublicKey() PublicKey
     Sign(data []byte) ([]byte, error)
     Type() KeyType
+    FromBytes(data []byte) (PrivateKey, error)
 }
 ```
 
@@ -273,6 +272,7 @@ type PublicKey interface {
     Address() types.Address
     Verify(data []byte, signature []byte) bool
     Type() KeyType
+    FromBytes(data []byte) (PublicKey, error)
 }
 ```
 
@@ -307,8 +307,9 @@ go test -v ./crypto
 
 ## Dependencies
 
-- `golang.org/x/crypto/sha3` for Keccak256 hash function
+- `golang.org/x/crypto/sha3` for Hash hash function
 - `golang.org/x/crypto/scrypt` for password-based key derivation
+- `github.com/btcsuite/btcd/btcec/v2` for secp256k1 and Schnorr signatures
 
 ## License
 

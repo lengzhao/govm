@@ -13,7 +13,6 @@ import (
 
 	"github.com/lengzhao/govm/types"
 	"golang.org/x/crypto/scrypt"
-	"golang.org/x/crypto/sha3"
 )
 
 // Crypto defines the interface for cryptographic operations.
@@ -30,9 +29,6 @@ type Crypto interface {
 
 	// Hash computes the hash of the given data.
 	Hash(data []byte) types.Hash
-
-	// Keccak256 computes the Keccak256 hash of the given data.
-	Keccak256(data []byte) types.Hash
 
 	// GenerateAddress generates an address from the given public key.
 	GenerateAddress(publicKey PublicKey) types.Address
@@ -143,15 +139,6 @@ func (c *DefaultCrypto) Verify(data []byte, signature []byte, publicKey PublicKe
 func (c *DefaultCrypto) Hash(data []byte) types.Hash {
 	hash := sha256.Sum256(data)
 	return types.Hash(hash)
-}
-
-// Keccak256 computes the Keccak256 hash of the given data.
-func (c *DefaultCrypto) Keccak256(data []byte) types.Hash {
-	hasher := sha3.NewLegacyKeccak256()
-	hasher.Write(data)
-	var result types.Hash
-	copy(result[:], hasher.Sum(nil))
-	return result
 }
 
 // GenerateAddress generates an address from the given public key.
@@ -296,9 +283,10 @@ func LoadFromFile(filename string, password string) (PrivateKey, error) {
 		return nil, fmt.Errorf("failed to decrypt private key: %w", err)
 	}
 
+	// Recreate the private key based on its type
 	priv, _, err := NewCrypto().GenerateKeyPair(encryptedKeyFile.Type)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate private key: %w", err)
+		return nil, fmt.Errorf("failed to generate %s private key: %w", encryptedKeyFile.Type, err)
 	}
 	return priv.FromBytes(privateKeyBytes)
 }

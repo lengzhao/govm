@@ -47,7 +47,7 @@ func (k *schnorrPrivateKey) Sign(data []byte) ([]byte, error) {
 
 // Type returns the key type.
 func (k *schnorrPrivateKey) Type() KeyType {
-	return "schnorr"
+	return Schnorr
 }
 
 // schnorrPublicKey implements the PublicKey interface for Schnorr keys.
@@ -98,7 +98,7 @@ func (k *schnorrPublicKey) Verify(data []byte, signature []byte) bool {
 
 // Type returns the key type.
 func (k *schnorrPublicKey) Type() KeyType {
-	return "schnorr"
+	return Schnorr
 }
 
 // GenerateSchnorrKeyPair generates a new Schnorr key pair.
