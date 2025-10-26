@@ -8,7 +8,7 @@ import (
 func TestEd25519KeyGeneration(t *testing.T) {
 	crypto := NewCrypto()
 
-	priv, pub, err := crypto.GenerateEd25519KeyPair()
+	priv, pub, err := crypto.GenerateKeyPair(Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestEd25519KeyGeneration(t *testing.T) {
 func TestECDSAKeyGeneration(t *testing.T) {
 	crypto := NewCrypto()
 
-	priv, pub, err := crypto.GenerateECDSAKeyPair()
+	priv, pub, err := crypto.GenerateKeyPair(ECDSA)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestECDSAKeyGeneration(t *testing.T) {
 func TestEd25519SigningAndVerification(t *testing.T) {
 	crypto := NewCrypto()
 
-	priv, pub, err := crypto.GenerateEd25519KeyPair()
+	priv, pub, err := crypto.GenerateKeyPair(Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestEd25519SigningAndVerification(t *testing.T) {
 func TestECDSASigningAndVerification(t *testing.T) {
 	crypto := NewCrypto()
 
-	priv, pub, err := crypto.GenerateECDSAKeyPair()
+	priv, pub, err := crypto.GenerateKeyPair(ECDSA)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestAddressGeneration(t *testing.T) {
 	crypto := NewCrypto()
 
 	// Test Ed25519 address generation
-	_, edPub, err := crypto.GenerateEd25519KeyPair()
+	_, edPub, err := crypto.GenerateKeyPair(Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestAddressGeneration(t *testing.T) {
 	}
 
 	// Test ECDSA address generation
-	_, ecPub, err := crypto.GenerateECDSAKeyPair()
+	_, ecPub, err := crypto.GenerateKeyPair(ECDSA)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestPrivateKeyBytes(t *testing.T) {
 	crypto := NewCrypto()
 
 	// Test Ed25519 private key bytes
-	edPriv, _, err := crypto.GenerateEd25519KeyPair()
+	edPriv, _, err := crypto.GenerateKeyPair(Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -208,7 +208,7 @@ func TestPrivateKeyBytes(t *testing.T) {
 	}
 
 	// Test ECDSA private key bytes
-	ecPriv, _, err := crypto.GenerateECDSAKeyPair()
+	ecPriv, _, err := crypto.GenerateKeyPair(ECDSA)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestPublicKeyBytes(t *testing.T) {
 	crypto := NewCrypto()
 
 	// Test Ed25519 public key bytes
-	_, edPub, err := crypto.GenerateEd25519KeyPair()
+	_, edPub, err := crypto.GenerateKeyPair(Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestPublicKeyBytes(t *testing.T) {
 	}
 
 	// Test ECDSA public key bytes
-	_, ecPub, err := crypto.GenerateECDSAKeyPair()
+	_, ecPub, err := crypto.GenerateKeyPair(ECDSA)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestPublicKeyFromPrivateKey(t *testing.T) {
 	crypto := NewCrypto()
 
 	// Test Ed25519
-	edPriv, edPub, err := crypto.GenerateEd25519KeyPair()
+	edPriv, edPub, err := crypto.GenerateKeyPair(Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -265,7 +265,7 @@ func TestPublicKeyFromPrivateKey(t *testing.T) {
 	}
 
 	// Test ECDSA
-	ecPriv, ecPub, err := crypto.GenerateECDSAKeyPair()
+	ecPriv, ecPub, err := crypto.GenerateKeyPair(ECDSA)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -282,7 +282,7 @@ func TestEmptyDataSigning(t *testing.T) {
 	crypto := NewCrypto()
 
 	// Test Ed25519 with empty data
-	edPriv, edPub, err := crypto.GenerateEd25519KeyPair()
+	edPriv, edPub, err := crypto.GenerateKeyPair(Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -298,7 +298,7 @@ func TestEmptyDataSigning(t *testing.T) {
 	}
 
 	// Test ECDSA with empty data
-	ecPriv, ecPub, err := crypto.GenerateECDSAKeyPair()
+	ecPriv, ecPub, err := crypto.GenerateKeyPair(ECDSA)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -323,7 +323,7 @@ func TestLargeDataSigning(t *testing.T) {
 	}
 
 	// Test Ed25519 with large data
-	edPriv, edPub, err := crypto.GenerateEd25519KeyPair()
+	edPriv, edPub, err := crypto.GenerateKeyPair(Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -338,7 +338,7 @@ func TestLargeDataSigning(t *testing.T) {
 	}
 
 	// Test ECDSA with large data
-	ecPriv, ecPub, err := crypto.GenerateECDSAKeyPair()
+	ecPriv, ecPub, err := crypto.GenerateKeyPair(ECDSA)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -359,7 +359,7 @@ func TestDeterministicSignatures(t *testing.T) {
 	data := []byte("test data")
 
 	// Test Ed25519 deterministic signatures
-	edPriv, edPub, err := crypto.GenerateEd25519KeyPair()
+	edPriv, edPub, err := crypto.GenerateKeyPair(Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -395,7 +395,7 @@ func TestSaveAndLoadKeys(t *testing.T) {
 	crypto := NewCrypto()
 
 	// Test with Ed25519
-	edPriv, _, err := crypto.GenerateEd25519KeyPair()
+	edPriv, _, err := crypto.GenerateKeyPair(Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -425,7 +425,7 @@ func TestSaveAndLoadKeys(t *testing.T) {
 	}
 
 	// Test with ECDSA
-	ecPriv, _, err := crypto.GenerateECDSAKeyPair()
+	ecPriv, _, err := crypto.GenerateKeyPair(ECDSA)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -461,7 +461,7 @@ func TestSaveAndLoadKeysWithPassword(t *testing.T) {
 	password := "test-password-123"
 
 	// Test with Ed25519
-	edPriv, _, err := crypto.GenerateEd25519KeyPair()
+	edPriv, _, err := crypto.GenerateKeyPair(Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -497,7 +497,7 @@ func TestSaveAndLoadKeysWithPassword(t *testing.T) {
 	}
 
 	// Test with ECDSA
-	ecPriv, _, err := crypto.GenerateECDSAKeyPair()
+	ecPriv, _, err := crypto.GenerateKeyPair(ECDSA)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -538,7 +538,7 @@ func TestBackwardCompatibility(t *testing.T) {
 	crypto := NewCrypto()
 
 	// Create a key file using the new method with default password
-	edPriv, _, err := crypto.GenerateEd25519KeyPair()
+	edPriv, _, err := crypto.GenerateKeyPair(Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -565,5 +565,108 @@ func TestBackwardCompatibility(t *testing.T) {
 	// Verify that the keys have the same bytes
 	if string(loadedEdPriv.Bytes()) != string(edPriv.Bytes()) {
 		t.Error("Loaded Ed25519 key bytes do not match original")
+	}
+}
+
+// Test FromBytes methods
+func TestPrivateKeyFromBytes(t *testing.T) {
+	crypto := NewCrypto()
+
+	// Test Ed25519 private key FromBytes
+	edPriv, _, err := crypto.GenerateKeyPair(Ed25519)
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
+	}
+
+	edBytes := edPriv.Bytes()
+	reconstructedEdPriv, err := edPriv.FromBytes(edBytes)
+	if err != nil {
+		t.Fatalf("Failed to reconstruct Ed25519 private key from bytes: %v", err)
+	}
+
+	if reconstructedEdPriv.Type() != edPriv.Type() {
+		t.Errorf("Expected reconstructed key type %s, got %s", edPriv.Type(), reconstructedEdPriv.Type())
+	}
+
+	if string(reconstructedEdPriv.Bytes()) != string(edPriv.Bytes()) {
+		t.Error("Reconstructed Ed25519 private key bytes do not match original")
+	}
+
+	// Test ECDSA private key FromBytes
+	ecPriv, _, err := crypto.GenerateKeyPair(ECDSA)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
+	}
+
+	ecBytes := ecPriv.Bytes()
+	reconstructedEcPriv, err := ecPriv.FromBytes(ecBytes)
+	if err != nil {
+		t.Fatalf("Failed to reconstruct ECDSA private key from bytes: %v", err)
+	}
+
+	if reconstructedEcPriv.Type() != ecPriv.Type() {
+		t.Errorf("Expected reconstructed key type %s, got %s", ecPriv.Type(), reconstructedEcPriv.Type())
+	}
+
+	if string(reconstructedEcPriv.Bytes()) != string(ecPriv.Bytes()) {
+		t.Error("Reconstructed ECDSA private key bytes do not match original")
+	}
+}
+
+func TestPublicKeyFromBytes(t *testing.T) {
+	crypto := NewCrypto()
+
+	// Test Ed25519 public key FromBytes
+	_, edPub, err := crypto.GenerateKeyPair(Ed25519)
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
+	}
+
+	edBytes := edPub.Bytes()
+	reconstructedEdPub, err := edPub.FromBytes(edBytes)
+	if err != nil {
+		t.Fatalf("Failed to reconstruct Ed25519 public key from bytes: %v", err)
+	}
+
+	if reconstructedEdPub.Type() != edPub.Type() {
+		t.Errorf("Expected reconstructed key type %s, got %s", edPub.Type(), reconstructedEdPub.Type())
+	}
+
+	if string(reconstructedEdPub.Bytes()) != string(edPub.Bytes()) {
+		t.Error("Reconstructed Ed25519 public key bytes do not match original")
+	}
+
+	// Verify that both keys produce the same address
+	originalAddr := edPub.Address()
+	reconstructedAddr := reconstructedEdPub.Address()
+	if originalAddr != reconstructedAddr {
+		t.Error("Reconstructed Ed25519 public key produces different address")
+	}
+
+	// Test ECDSA public key FromBytes
+	_, ecPub, err := crypto.GenerateKeyPair(ECDSA)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
+	}
+
+	ecBytes := ecPub.Bytes()
+	reconstructedEcPub, err := ecPub.FromBytes(ecBytes)
+	if err != nil {
+		t.Fatalf("Failed to reconstruct ECDSA public key from bytes: %v", err)
+	}
+
+	if reconstructedEcPub.Type() != ecPub.Type() {
+		t.Errorf("Expected reconstructed key type %s, got %s", ecPub.Type(), reconstructedEcPub.Type())
+	}
+
+	if string(reconstructedEcPub.Bytes()) != string(ecPub.Bytes()) {
+		t.Error("Reconstructed ECDSA public key bytes do not match original")
+	}
+
+	// Verify that both keys produce the same address
+	originalECAddr := ecPub.Address()
+	reconstructedECAddr := reconstructedEcPub.Address()
+	if originalECAddr != reconstructedECAddr {
+		t.Error("Reconstructed ECDSA public key produces different address")
 	}
 }

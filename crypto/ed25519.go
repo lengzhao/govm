@@ -18,6 +18,13 @@ func (k *ed25519PrivateKey) Bytes() []byte {
 	return k.key
 }
 
+// FromBytes creates an Ed25519 private key from bytes.
+func (k *ed25519PrivateKey) FromBytes(data []byte) (PrivateKey, error) {
+	// For Ed25519, the private key bytes can be used directly
+	privKey := ed25519.PrivateKey(data)
+	return &ed25519PrivateKey{key: privKey}, nil
+}
+
 // PublicKey returns the corresponding Ed25519 public key.
 func (k *ed25519PrivateKey) PublicKey() PublicKey {
 	pubKey := k.key.Public().(ed25519.PublicKey)
@@ -42,6 +49,13 @@ type ed25519PublicKey struct {
 // Bytes returns the Ed25519 public key as bytes.
 func (k *ed25519PublicKey) Bytes() []byte {
 	return k.key
+}
+
+// FromBytes creates an Ed25519 public key from bytes.
+func (k *ed25519PublicKey) FromBytes(data []byte) (PublicKey, error) {
+	// For Ed25519, the public key bytes can be used directly
+	pubKey := ed25519.PublicKey(data)
+	return &ed25519PublicKey{key: pubKey}, nil
 }
 
 // Address generates an address from the Ed25519 public key.
@@ -73,11 +87,4 @@ func GenerateEd25519KeyPair() (PrivateKey, PublicKey, error) {
 	priv := &ed25519PrivateKey{key: privKey}
 	pub := &ed25519PublicKey{key: privKey.Public().(ed25519.PublicKey)}
 	return priv, pub, nil
-}
-
-// Ed25519PrivateKeyFromBytes creates an Ed25519 private key from bytes.
-func Ed25519PrivateKeyFromBytes(data []byte) (PrivateKey, error) {
-	// For Ed25519, the private key bytes can be used directly
-	privKey := ed25519.PrivateKey(data)
-	return &ed25519PrivateKey{key: privKey}, nil
 }

@@ -1,14 +1,97 @@
-# Crypto Module
+# Crypto Package
 
-The crypto module provides cryptographic functions for the govm blockchain platform. It supports both Ed25519 and ECDSA algorithms for digital signatures, along with hash functions and address generation.
+This package provides cryptographic functions for the govm blockchain, including support for multiple signature schemes.
 
-## Features
+## Supported Signature Schemes
 
-- **Ed25519**: Fast and secure digital signature algorithm
-- **ECDSA**: Elliptic Curve Digital Signature Algorithm
-- **Hash Functions**: SHA256 and Keccak256
-- **Address Generation**: Generate blockchain addresses from public keys
-- **Key Encryption**: Save and load encrypted private keys with password protection
+1. **Ed25519** - Default signature scheme
+2. **ECDSA** - Elliptic Curve Digital Signature Algorithm using P-256 curve
+3. **Secp256k1** - Elliptic Curve Digital Signature Algorithm using secp256k1 curve (Bitcoin standard)
+4. **Schnorr** - Schnorr signatures using secp256k1 curve (Bitcoin Taproot standard)
+
+## Key Generation
+
+```go
+// Create a new crypto instance
+crypto := NewCrypto()
+
+// Generate different types of key pairs using the unified method
+ed25519Priv, ed25519Pub, _ := crypto.GenerateKeyPair(Ed25519)
+ecdsaPriv, ecdsaPub, _ := crypto.GenerateKeyPair(ECDSA)
+secp256k1Priv, secp256k1Pub, _ := crypto.GenerateKeyPair(Secp256k1)
+schnorrPriv, schnorrPub, _ := crypto.GenerateKeyPair(Schnorr)
+```
+
+## Signing and Verification
+
+```go
+// Sign data
+data := []byte("Hello, World!")
+signature, _ := crypto.Sign(data, privateKey)
+
+// Verify signature
+valid := crypto.Verify(data, signature, publicKey)
+```
+
+## Address Generation
+
+```go
+// Generate address from public key
+address := crypto.GenerateAddress(publicKey)
+```
+
+## Key Serialization
+
+```go
+// Serialize keys to bytes
+privBytes := privateKey.Bytes()
+pubBytes := publicKey.Bytes()
+
+// Deserialize keys from bytes
+reconstructedPriv, _ := privateKey.FromBytes(privBytes)
+reconstructedPub, _ := publicKey.FromBytes(pubBytes)
+```
+
+## Key Storage
+
+```go
+// Save private key to encrypted file
+err := SaveToFile(privateKey, "key.json", "password")
+
+// Load private key from encrypted file
+loadedPriv, err := LoadFromFile("key.json", "password")
+```
+
+## Secp256k1 and Schnorr Support
+
+The package now includes support for Bitcoin-standard secp256k1 ECDSA and Schnorr signatures through the btcec library.
+
+### Secp256k1 Features:
+- Uses the same elliptic curve as Bitcoin (secp256k1)
+- Compatible with Bitcoin wallets and tools
+- Compressed public key format (33 bytes)
+- Standard ECDSA signatures
+
+### Schnorr Features:
+- Implements BIP-340 Schnorr signatures
+- 32-byte public keys
+- 64-byte signatures
+- Better privacy and efficiency than ECDSA
+- Supports signature aggregation (for future multi-signature support)
+
+## Module Structure
+
+The crypto package is organized into separate files for each signature scheme:
+
+- `ed25519.go` - Ed25519 signature implementation
+- `ecdsa.go` - ECDSA signature implementation using P-256 curve
+- `secp256k1.go` - ECDSA signature implementation using secp256k1 curve
+- `schnorr.go` - Schnorr signature implementation using secp256k1 curve
+
+## Usage Examples
+
+See `example_secp256k1.go` for detailed examples of how to use secp256k1 and Schnorr signatures.
+See `example_unified.go` for examples of how to use the unified GenerateKeyPair method.
 
 ## Installation
 

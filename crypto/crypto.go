@@ -18,14 +18,9 @@ import (
 
 // Crypto defines the interface for cryptographic operations.
 type Crypto interface {
-	// GenerateKeyPair generates a new key pair.
-	GenerateKeyPair() (PrivateKey, PublicKey, error)
-
-	// GenerateEd25519KeyPair generates a new Ed25519 key pair.
-	GenerateEd25519KeyPair() (PrivateKey, PublicKey, error)
-
-	// GenerateECDSAKeyPair generates a new ECDSA key pair.
-	GenerateECDSAKeyPair() (PrivateKey, PublicKey, error)
+	// GenerateKeyPair generates a new key pair of the specified type.
+	// If no key type is specified, it generates an Ed25519 key pair by default.
+	GenerateKeyPair(keyType KeyType) (PrivateKey, PublicKey, error)
 
 	// Sign signs data with the given private key.
 	Sign(data []byte, privateKey PrivateKey) ([]byte, error)
@@ -56,6 +51,9 @@ type PrivateKey interface {
 
 	// Type returns the type of the private key.
 	Type() KeyType
+
+	// FromBytes creates a private key from bytes.
+	FromBytes(data []byte) (PrivateKey, error)
 }
 
 // PublicKey represents a public key interface.
@@ -71,6 +69,9 @@ type PublicKey interface {
 
 	// Type returns the type of the public key.
 	Type() KeyType
+
+	// FromBytes creates a public key from bytes.
+	FromBytes(data []byte) (PublicKey, error)
 }
 
 // KeyType represents the type of cryptographic key.
@@ -81,6 +82,10 @@ const (
 	Ed25519 KeyType = "ed25519"
 	// ECDSA key type
 	ECDSA KeyType = "ecdsa"
+	// Secp256k1 key type
+	Secp256k1 KeyType = "secp256k1"
+	// Schnorr key type
+	Schnorr KeyType = "schnorr"
 )
 
 // KeyFile represents the structure of a saved key file.
@@ -106,19 +111,19 @@ type EncryptedKeyFile struct {
 type DefaultCrypto struct{}
 
 // GenerateKeyPair generates a new key pair of the specified type.
-func (c *DefaultCrypto) GenerateKeyPair() (PrivateKey, PublicKey, error) {
-	// For now, we'll generate an Ed25519 key pair by default
-	return c.GenerateEd25519KeyPair()
-}
-
-// GenerateEd25519KeyPair generates a new Ed25519 key pair.
-func (c *DefaultCrypto) GenerateEd25519KeyPair() (PrivateKey, PublicKey, error) {
-	return GenerateEd25519KeyPair()
-}
-
-// GenerateECDSAKeyPair generates a new ECDSA key pair using the secp256k1 curve.
-func (c *DefaultCrypto) GenerateECDSAKeyPair() (PrivateKey, PublicKey, error) {
-	return GenerateECDSAKeyPair()
+func (c *DefaultCrypto) GenerateKeyPair(keyType KeyType) (PrivateKey, PublicKey, error) {
+	switch keyType {
+	case Ed25519:
+		return GenerateEd25519KeyPair()
+	case ECDSA:
+		return GenerateECDSAKeyPair()
+	case Secp256k1:
+		return GenerateSecp256k1KeyPair()
+	case Schnorr:
+		return GenerateSchnorrKeyPair()
+	default:
+		return nil, nil, fmt.Errorf("unsupported key type: %s", keyType)
+	}
 }
 
 // Sign signs data with the given private key.
@@ -128,7 +133,10 @@ func (c *DefaultCrypto) Sign(data []byte, privateKey PrivateKey) ([]byte, error)
 
 // Verify verifies a signature with the given public key.
 func (c *DefaultCrypto) Verify(data []byte, signature []byte, publicKey PublicKey) bool {
-	return publicKey.Verify(data, signature)
+	if publicKey != nil {
+		return publicKey.Verify(data, signature)
+	}
+	return false
 }
 
 // Hash computes the SHA256 hash of the given data.
@@ -288,15 +296,11 @@ func LoadFromFile(filename string, password string) (PrivateKey, error) {
 		return nil, fmt.Errorf("failed to decrypt private key: %w", err)
 	}
 
-	// Recreate the private key based on its type
-	switch encryptedKeyFile.Type {
-	case Ed25519:
-		return Ed25519PrivateKeyFromBytes(privateKeyBytes)
-	case ECDSA:
-		return ECDSAPrivateKeyFromBytes(privateKeyBytes)
-	default:
-		return nil, fmt.Errorf("unsupported key type: %s", encryptedKeyFile.Type)
+	priv, _, err := NewCrypto().GenerateKeyPair(encryptedKeyFile.Type)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate private key: %w", err)
 	}
+	return priv.FromBytes(privateKeyBytes)
 }
 
 // NewCrypto creates a new instance of the default crypto implementation.

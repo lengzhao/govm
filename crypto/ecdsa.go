@@ -5,6 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"fmt"
 	"math/big"
 
 	"github.com/lengzhao/govm/types"
@@ -18,6 +19,25 @@ type ecdsaPrivateKey struct {
 // Bytes returns the ECDSA private key as bytes.
 func (k *ecdsaPrivateKey) Bytes() []byte {
 	return k.key.D.Bytes()
+}
+
+// FromBytes creates an ECDSA private key from bytes.
+func (k *ecdsaPrivateKey) FromBytes(data []byte) (PrivateKey, error) {
+	// Create a new private key from the D value
+	d := new(big.Int).SetBytes(data)
+
+	// Create the private key with the P256 curve
+	privKey := &ecdsa.PrivateKey{
+		PublicKey: ecdsa.PublicKey{
+			Curve: elliptic.P256(),
+		},
+		D: d,
+	}
+
+	// Calculate the public key coordinates
+	privKey.PublicKey.X, privKey.PublicKey.Y = privKey.PublicKey.Curve.ScalarBaseMult(data)
+
+	return &ecdsaPrivateKey{key: privKey}, nil
 }
 
 // PublicKey returns the corresponding ECDSA public key.
@@ -59,6 +79,23 @@ type ecdsaPublicKey struct {
 func (k *ecdsaPublicKey) Bytes() []byte {
 	// Compress the public key (33 bytes)
 	return elliptic.MarshalCompressed(k.key.Curve, k.key.X, k.key.Y)
+}
+
+// FromBytes creates an ECDSA public key from bytes.
+func (k *ecdsaPublicKey) FromBytes(data []byte) (PublicKey, error) {
+	// Parse the compressed public key
+	x, y := elliptic.UnmarshalCompressed(elliptic.P256(), data)
+	if x == nil || y == nil {
+		return nil, fmt.Errorf("invalid public key data")
+	}
+
+	pubKey := &ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     x,
+		Y:     y,
+	}
+
+	return &ecdsaPublicKey{key: pubKey}, nil
 }
 
 // Address generates an address from the ECDSA public key.
