@@ -1,15 +1,43 @@
 package consensus
 
 import (
-	"encoding/json"
+	"encoding/binary"
 	"fmt"
 	"testing"
 	"time"
 
+	lzbinary "github.com/lengzhao/binary"
 	"github.com/lengzhao/govm/crypto"
+	"github.com/lengzhao/govm/storage"
 	"github.com/lengzhao/govm/types"
 	"github.com/stretchr/testify/assert"
 )
+
+func createTestStorage() storage.Storage {
+	// 创建内存存储用于测试
+	memStorage := storage.NewMemoryStorage("test")
+	memStorage.Start()
+	return memStorage
+}
+
+func createTestStorageWithValidator(height uint64, validator *ValidatorInfo) storage.Storage {
+	// 创建内存存储用于测试
+	memStorage := storage.NewMemoryStorage("test")
+	memStorage.Start()
+
+	// 创建验证者存储命名空间
+	validatorStorage, _ := memStorage.NewStorage(types.SNValidator)
+
+	// 将验证者信息存储到指定高度
+	key := make([]byte, 8)
+	binary.BigEndian.PutUint64(key, height)
+
+	data, _ := lzbinary.Marshal(validator)
+	validatorStorage.Put(key, data)
+
+	// 返回原始存储实例
+	return memStorage
+}
 
 func TestNewPoAConsensus(t *testing.T) {
 	// 创建验证节点地址列表
@@ -27,8 +55,11 @@ func TestNewPoAConsensus(t *testing.T) {
 		RoundLength:   5,    // 5个区块为一轮
 	}
 
+	// 创建存储实例
+	store := createTestStorage()
+
 	// 创建PoA共识实例
-	poa := NewPoAConsensus(config)
+	poa := NewPoAConsensus(config, store)
 
 	// 验证轮次和轮值初始化
 	assert.Equal(t, uint64(0), poa.GetRound())
@@ -51,8 +82,11 @@ func TestPoAValidators(t *testing.T) {
 		RoundLength:   3,
 	}
 
+	// 创建存储实例
+	store := createTestStorage()
+
 	// 创建PoA共识实例
-	poa := NewPoAConsensus(config)
+	poa := NewPoAConsensus(config, store)
 
 	// 测试检查验证者
 	var testAddr types.Address
@@ -84,8 +118,11 @@ func TestPoARoundAndTurn(t *testing.T) {
 		RoundLength:   4,
 	}
 
+	// 创建存储实例
+	store := createTestStorage()
+
 	// 创建PoA共识实例
-	poa := NewPoAConsensus(config)
+	poa := NewPoAConsensus(config, store)
 
 	// 测试轮次和轮值
 	assert.Equal(t, uint64(0), poa.GetRound())
@@ -106,8 +143,11 @@ func TestBlockValidation(t *testing.T) {
 		RoundLength:   1,
 	}
 
+	// 创建存储实例
+	store := createTestStorage()
+
 	// 创建PoA共识实例
-	poa := NewPoAConsensus(config)
+	poa := NewPoAConsensus(config, store)
 
 	// 创建一个有效的区块
 	cryptoInstance := crypto.NewCrypto()
@@ -119,13 +159,14 @@ func TestBlockValidation(t *testing.T) {
 		ShardID:     1,
 		BlockNumber: 0,
 		Timestamp:   uint64(time.Now().UnixNano() / 1000000), // 毫秒时间戳
+		Validator:   addr,
 		PrevHash:    types.Hash{},
 		MerkleRoot:  types.Hash{},
 		OtherShards: [3]types.Hash{},
 	}
 
 	// 序列化区块头用于签名
-	data, err := json.Marshal(header)
+	data, err := lzbinary.Marshal(header)
 	assert.NoError(t, err)
 
 	// 签名区块头
@@ -164,8 +205,11 @@ func TestEmptyBlock(t *testing.T) {
 		RoundLength:   1,
 	}
 
+	// 创建存储实例
+	store := createTestStorage()
+
 	// 创建PoA共识实例
-	poa := NewPoAConsensus(config)
+	poa := NewPoAConsensus(config, store)
 
 	// 创建一个空区块（使用空签名）
 	emptyBlock := &types.Block{
@@ -174,6 +218,7 @@ func TestEmptyBlock(t *testing.T) {
 				ShardID:     1,
 				BlockNumber: 0,
 				Timestamp:   uint64(time.Now().UnixNano() / 1000000),
+				Validator:   addr,
 				PrevHash:    types.Hash{},
 				MerkleRoot:  types.Hash{},
 				OtherShards: [3]types.Hash{},
@@ -205,8 +250,11 @@ func TestUpdateValidators(t *testing.T) {
 		RoundLength:   3,
 	}
 
+	// 创建存储实例
+	store := createTestStorage()
+
 	// 创建PoA共识实例
-	poa := NewPoAConsensus(config)
+	poa := NewPoAConsensus(config, store)
 
 	// 创建新的验证节点地址列表
 	newValidators := make([]types.Address, 5)
@@ -224,4 +272,47 @@ func TestUpdateValidators(t *testing.T) {
 	var newValidatorAddr types.Address
 	copy(newValidatorAddr[:], []byte("new-validator-03"))
 	assert.True(t, poa.IsValidator(newValidatorAddr))
+}
+
+func TestGetValidatorsAtHeight(t *testing.T) {
+	// 创建验证节点地址列表
+	validators := make([]types.Address, 1)
+	var addr types.Address
+	copy(addr[:], []byte("test-validator"))
+	validators[0] = addr
+
+	// 创建PoA配置
+	config := &PoAConfig{
+		Validators:    validators,
+		BlockInterval: 2000,
+		RoundLength:   1,
+	}
+
+	// 创建测试验证者信息
+	validatorInfo := &ValidatorInfo{
+		Address:   addr,
+		PublicKey: make([]byte, 32),
+		Stake:     1000,
+		LastBlock: 10,
+		IsActive:  true,
+	}
+
+	// 创建带验证者信息的存储实例
+	store := createTestStorageWithValidator(5, validatorInfo)
+
+	// 创建PoA共识实例
+	poa := NewPoAConsensus(config, store).(*DefaultPoA)
+
+	// 测试获取指定高度的验证者信息
+	result, err := poa.GetValidatorsAtHeight(5)
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, addr, result.Address)
+	assert.Equal(t, uint64(1000), result.Stake)
+	assert.Equal(t, uint64(10), result.LastBlock)
+	assert.Equal(t, true, result.IsActive)
+
+	// 测试获取不存在高度的验证者信息（应该返回错误）
+	_, err = poa.GetValidatorsAtHeight(100)
+	assert.Error(t, err)
 }

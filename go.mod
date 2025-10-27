@@ -5,7 +5,7 @@ go 1.24.2
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1
-	github.com/lengzhao/binary v0.2.0
+	github.com/lengzhao/binary v0.2.1
 	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.0
 	golang.org/x/crypto v0.36.0

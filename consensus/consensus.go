@@ -1,10 +1,13 @@
 package consensus
 
 import (
+	"encoding/binary"
 	"fmt"
+	"time"
 
-	"github.com/lengzhao/binary"
+	lzbinary "github.com/lengzhao/binary"
 	"github.com/lengzhao/govm/crypto"
+	"github.com/lengzhao/govm/storage"
 	"github.com/lengzhao/govm/types"
 )
 
@@ -63,13 +66,19 @@ type PoAConsensus interface {
 
 // DefaultPoA 默认PoA共识实现
 type DefaultPoA struct {
-	config *PoAConfig
-	state  *ConsensusState
-	crypto crypto.Crypto
+	config  *PoAConfig
+	state   *ConsensusState
+	crypto  crypto.Crypto
+	storage storage.Storage // 添加存储实例
 }
 
 // NewPoAConsensus 创建新的PoA共识实例
-func NewPoAConsensus(config *PoAConfig) PoAConsensus {
+func NewPoAConsensus(config *PoAConfig, storage storage.Storage) PoAConsensus {
+	vs, err := storage.NewStorage(types.SNValidator)
+	if err != nil {
+		return nil
+	}
+
 	return &DefaultPoA{
 		config: config,
 		state: &ConsensusState{
@@ -78,7 +87,8 @@ func NewPoAConsensus(config *PoAConfig) PoAConsensus {
 			Validators:    make([]ValidatorInfo, len(config.Validators)),
 			LastBlockTime: 0,
 		},
-		crypto: crypto.NewCrypto(),
+		crypto:  crypto.NewCrypto(),
+		storage: vs, // validator storage
 	}
 }
 
@@ -156,14 +166,17 @@ func (p *DefaultPoA) verifyBlockSignature(block *types.Block) error {
 		return fmt.Errorf("invalid validator index")
 	}
 
-	validator := p.state.Validators[validatorIndex]
+	validator, err := p.GetValidatorsAtHeight(block.Header.BlockNumber)
+	if err != nil {
+		return fmt.Errorf("failed to get validator info: %w", err)
+	}
 
 	// 重建区块头用于签名验证（排除签名字段）
 	blockCopy := *block
 	blockCopy.Header.Signature = nil
 
 	// 序列化区块头用于签名验证
-	data, err := binary.Marshal(&blockCopy.Header.BlockHeader)
+	data, err := lzbinary.Marshal(&blockCopy.Header.BlockHeader)
 	if err != nil {
 		return fmt.Errorf("failed to marshal block header: %w", err)
 	}
@@ -196,8 +209,12 @@ func (p *DefaultPoA) verifyTimestamp(block *types.Block) error {
 
 	// 检查时间戳是否符合出块间隔
 	expectedTime := p.state.LastBlockTime + p.config.BlockInterval
-	if block.Header.Timestamp > expectedTime+1000 { // 允许1秒误差
-		return fmt.Errorf("block timestamp is too far in the future")
+	if block.Header.Timestamp != expectedTime { // 不允许误差
+		return fmt.Errorf("block timestamp is too far in the past")
+	}
+	currentMs := time.Now().UnixMilli()
+	if block.Header.Timestamp > uint64(currentMs+1000) {
+		return fmt.Errorf("block timestamp is in the future")
 	}
 
 	return nil
@@ -207,6 +224,9 @@ func (p *DefaultPoA) verifyTimestamp(block *types.Block) error {
 func (p *DefaultPoA) verifyAdjacentShards(block *types.Block) error {
 	// 在实际实现中，这里会验证相邻分片的区块头哈希
 	// 由于这是第一阶段，暂时留空
+	if block.Header.OtherShards != [3]types.Hash{} {
+		return fmt.Errorf("adjacent shards verification not implemented")
+	}
 	return nil
 }
 
@@ -283,12 +303,6 @@ func (p *DefaultPoA) VerifyAuthority(block *types.Block) error {
 		return fmt.Errorf("no validators configured")
 	}
 
-	// 计算应该出块的验证节点索引
-	expectedIndex := block.Header.BlockNumber % uint64(len(p.config.Validators))
-
-	// 获取预期的验证节点地址
-	expectedValidator := p.config.Validators[expectedIndex]
-
 	// 对于空区块，我们使用不同的验证方式
 	if p.IsEmptyBlock(block) {
 		// 空区块的验证可以简化，只需要检查是否是正确的验证节点
@@ -296,20 +310,19 @@ func (p *DefaultPoA) VerifyAuthority(block *types.Block) error {
 		return nil
 	}
 
+	// 获取预期的验证节点地址
+	expectedValidator, err := p.GetValidatorsAtHeight(block.Header.BlockNumber)
+	if err != nil {
+		return fmt.Errorf("failed to get validator at height: %w", err)
+	}
+
 	// 检查区块头中的签名是否来自预期的验证节点
 	// 注意：这是一个简化的实现，在实际应用中需要更复杂的验证逻辑
-	if expectedValidator != getAddressFromSignature(block.Header.Signature) {
+	if expectedValidator.Address != block.Header.Validator {
 		return fmt.Errorf("block not signed by expected validator")
 	}
 
 	return nil
-}
-
-// getAddressFromSignature 从签名中提取地址（简化实现）
-func getAddressFromSignature(signature []byte) types.Address {
-	var addr types.Address
-	copy(addr[:], signature[:20]) // 简化实现，实际应通过签名恢复公钥再计算地址
-	return addr
 }
 
 // IsEmptyBlock 检查是否为空区块
@@ -328,4 +341,25 @@ func (p *DefaultPoA) GetConfig() *PoAConfig {
 // GetState 获取共识状态
 func (p *DefaultPoA) GetState() *ConsensusState {
 	return p.state
+}
+
+// GetValidatorsAtHeight 获取指定区块高度的验证者列表
+func (p *DefaultPoA) GetValidatorsAtHeight(height uint64) (*ValidatorInfo, error) {
+	// 构造存储键
+	key := make([]byte, 8)
+	binary.BigEndian.PutUint64(key, height)
+
+	// 从存储中获取验证者信息
+	data, err := p.storage.Get(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// 反序列化验证者信息
+	var validator ValidatorInfo
+	if err := lzbinary.Unmarshal(data, &validator); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal validators: %w", err)
+	}
+
+	return &validator, nil
 }

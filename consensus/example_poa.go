@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lengzhao/govm/storage"
 	"github.com/lengzhao/govm/types"
 )
 
@@ -26,7 +27,7 @@ func ExamplePoAUsage() {
 	}
 
 	// 创建PoA共识实例
-	poa := NewPoAConsensus(config)
+	poa := NewPoAConsensus(config, storage.NewMemoryStorage(""))
 
 	// 获取当前验证者
 	currentValidator := poa.GetValidator()
