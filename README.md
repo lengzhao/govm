@@ -103,6 +103,17 @@ graph TD
 
 更多详细信息请查看 [crypto模块文档](crypto/README.md)。
 
+## Core核心模块
+
+Core模块是区块链系统的核心组件，负责区块链的核心逻辑处理：
+
+- **区块管理**: 区块的创建、验证、存储和检索
+- **交易处理**: 交易的验证、执行和状态更新
+- **状态维护**: 维护区块链的全局状态
+- **模块协调**: 协调其他模块（共识、存储、网络等）的工作
+
+Core模块采用模块化设计，具有良好的扩展性和可维护性。详细信息请查看 [core模块文档](core/README.md)。
+
 ## 目录结构
 
 ```
@@ -117,6 +128,14 @@ govm/
 │   ├── example_poa.go
 │   └── consensus_test.go
 ├── core/
+│   ├── core.go
+│   ├── core_impl.go
+│   ├── blockchain.go
+│   ├── transaction.go
+│   ├── core_test.go
+│   ├── blockchain_test.go
+│   ├── transaction_test.go
+│   └── README.md
 ├── crypto/
 │   ├── crypto.go
 │   ├── crypto_test.go

@@ -37,6 +37,7 @@ type Transaction struct {
 	To      Address // 接收方地址
 	Amount  uint64  // 转账金额
 	Nonce   uint64  // 防重放攻击 nonce
+	Data    []byte  // 数据
 }
 
 // Transaction 交易结构
@@ -62,9 +63,10 @@ const (
 
 // storage namespace
 const (
-	SNBlock     = "1" // key=block.hash
-	SNStatus    = "2" // 全局状态
-	SNTx        = "3" // key=tx.hash
-	SNTxLog     = "4" // key=tx.hash
-	SNValidator = "5" // key=block.height
+	SNBlock      = "1" // key=block.hash
+	SNBlockIndex = "2" // key=block.number
+	SNStatus     = "3" // 全局状态
+	SNTx         = "4" // key=tx.hash
+	SNTxLog      = "5" // key=tx.hash
+	SNValidator  = "6" // key=block.height
 )

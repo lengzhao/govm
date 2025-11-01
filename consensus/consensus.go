@@ -62,6 +62,12 @@ type PoAConsensus interface {
 
 	// UpdateValidators 更新验证节点列表
 	UpdateValidators(validators []types.Address) error
+
+	// IsMyTurn 检查当前节点是否应该出块
+	IsMyTurn(height uint64, nodeAddress types.Address) bool
+
+	// GetCurrentValidator 获取当前应该出块的验证者地址
+	GetCurrentValidator(height uint64) types.Address
 }
 
 // DefaultPoA 默认PoA共识实现
@@ -160,12 +166,6 @@ func (p *DefaultPoA) verifyBlockSignature(block *types.Block) error {
 		return nil
 	}
 
-	// 获取出块验证节点的公钥
-	validatorIndex := block.Header.BlockNumber % uint64(len(p.config.Validators))
-	if validatorIndex >= uint64(len(p.state.Validators)) {
-		return fmt.Errorf("invalid validator index")
-	}
-
 	validator, err := p.GetValidatorsAtHeight(block.Header.BlockNumber)
 	if err != nil {
 		return fmt.Errorf("failed to get validator info: %w", err)
@@ -209,9 +209,11 @@ func (p *DefaultPoA) verifyTimestamp(block *types.Block) error {
 
 	// 检查时间戳是否符合出块间隔
 	expectedTime := p.state.LastBlockTime + p.config.BlockInterval
-	if block.Header.Timestamp != expectedTime { // 不允许误差
+	if block.Header.BlockNumber > 0 && block.Header.Timestamp < expectedTime {
 		return fmt.Errorf("block timestamp is too far in the past")
 	}
+
+	// 允许一定的时间误差（例如1秒）
 	currentMs := time.Now().UnixMilli()
 	if block.Header.Timestamp > uint64(currentMs+1000) {
 		return fmt.Errorf("block timestamp is in the future")
@@ -329,8 +331,8 @@ func (p *DefaultPoA) VerifyAuthority(block *types.Block) error {
 func (p *DefaultPoA) IsEmptyBlock(block *types.Block) bool {
 	// 空区块的判断条件：
 	// 1. 交易列表为空
-	// 2. 签名为空
-	return len(block.Transactions) == 0 && len(block.Header.Signature) == 0
+	// 2. 签名为空（可以是nil或空切片）
+	return len(block.Transactions) == 0 && (len(block.Header.Signature) == 0 || block.Header.Signature == nil)
 }
 
 // GetConfig 获取共识配置
@@ -352,7 +354,13 @@ func (p *DefaultPoA) GetValidatorsAtHeight(height uint64) (*ValidatorInfo, error
 	// 从存储中获取验证者信息
 	data, err := p.storage.Get(key)
 	if err != nil {
-		return nil, err
+		// 获取出块验证节点的公钥
+		validatorIndex := height % uint64(len(p.config.Validators))
+		if validatorIndex >= uint64(len(p.state.Validators)) {
+			return nil, fmt.Errorf("invalid validator index")
+		}
+		validator := p.state.Validators[validatorIndex]
+		return &validator, nil
 	}
 
 	// 反序列化验证者信息
@@ -362,4 +370,38 @@ func (p *DefaultPoA) GetValidatorsAtHeight(height uint64) (*ValidatorInfo, error
 	}
 
 	return &validator, nil
+}
+
+// IsMyTurn 检查当前节点是否应该出块
+func (p *DefaultPoA) IsMyTurn(height uint64, nodeAddress types.Address) bool {
+	if len(p.config.Validators) == 0 {
+		return false
+	}
+
+	// 计算应该出块的验证者索引
+	validatorIndex := height % uint64(len(p.config.Validators))
+
+	// 检查当前节点地址是否匹配应该出块的验证者地址
+	if validatorIndex < uint64(len(p.config.Validators)) {
+		return p.config.Validators[validatorIndex] == nodeAddress
+	}
+
+	return false
+}
+
+// GetCurrentValidator 获取当前应该出块的验证者地址
+func (p *DefaultPoA) GetCurrentValidator(height uint64) types.Address {
+	if len(p.config.Validators) == 0 {
+		return types.Address{}
+	}
+
+	// 计算应该出块的验证者索引
+	validatorIndex := height % uint64(len(p.config.Validators))
+
+	// 返回应该出块的验证者地址
+	if validatorIndex < uint64(len(p.config.Validators)) {
+		return p.config.Validators[validatorIndex]
+	}
+
+	return types.Address{}
 }
