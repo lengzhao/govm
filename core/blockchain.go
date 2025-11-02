@@ -158,6 +158,60 @@ func (bc *Blockchain) validateBlock(block *types.Block) error {
 		return fmt.Errorf("block height mismatch: expected %d, got %d", bc.height+1, block.Header.BlockNumber)
 	}
 
+	// 验证分片ID
+	if block.Header.ShardID != types.DefaultShardID {
+		return fmt.Errorf("block shard ID mismatch: expected %d, got %d", types.DefaultShardID, block.Header.ShardID)
+	}
+
+	// 验证时间戳
+	if block.Header.Timestamp == 0 && block.Header.BlockNumber != 0 {
+		return fmt.Errorf("block timestamp cannot be zero for non-genesis block")
+	}
+
+	// 验证Merkle根（如果区块包含交易）
+	if err := bc.validateMerkleRoot(block); err != nil {
+		return fmt.Errorf("merkle root validation failed: %w", err)
+	}
+
+	// 验证交易
+	if err := bc.validateTransactions(block); err != nil {
+		return fmt.Errorf("transaction validation failed: %w", err)
+	}
+
+	return nil
+}
+
+// validateMerkleRoot 验证Merkle根
+func (bc *Blockchain) validateMerkleRoot(block *types.Block) error {
+	// 如果区块不包含交易，Merkle根应该为空
+	if len(block.Transactions) == 0 {
+		if block.Header.MerkleRoot != [32]byte{} {
+			return fmt.Errorf("merkle root should be empty for block without transactions")
+		}
+		return nil
+	}
+
+	// 计算交易的Merkle根
+	merkleTree := NewMerkleTree(block.Transactions)
+	calculatedRoot := merkleTree.GetRootHash()
+
+	// 验证Merkle根是否匹配
+	if block.Header.MerkleRoot != calculatedRoot {
+		return fmt.Errorf("merkle root mismatch: expected %x, got %x", calculatedRoot, block.Header.MerkleRoot)
+	}
+
+	return nil
+}
+
+// validateTransactions 验证区块中的交易
+func (bc *Blockchain) validateTransactions(block *types.Block) error {
+	// 如果区块不包含交易，直接返回
+	if len(block.Transactions) == 0 {
+		return nil
+	}
+
+	// TODO: 实现交易验证逻辑
+	// 这需要从存储中获取每个交易并验证其有效性
 	return nil
 }
 

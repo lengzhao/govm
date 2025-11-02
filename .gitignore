@@ -33,3 +33,4 @@ build/
 .vscode/
 .qoder/
 govm
+node*/

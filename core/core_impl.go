@@ -33,7 +33,7 @@ func NewCore(config *CoreConfig, consensus consensus.PoAConsensus, storage stora
 	}
 
 	// 创建交易处理器
-	txProcessor := NewTxProcessor()
+	txProcessor := NewTxProcessor(storage)
 
 	core := &DefaultCore{
 		config:      config,
@@ -56,11 +56,13 @@ func (c *DefaultCore) Start() error {
 		return fmt.Errorf("core module is already running")
 	}
 
+	// 启动存储模块
+	if err := c.storage.Start(); err != nil {
+		return fmt.Errorf("failed to start storage: %w", err)
+	}
+
 	// 启动区块链
 	// 区块链已经在NewCore中初始化了
-
-	// 启动其他组件
-	// TODO: 启动其他需要的组件
 
 	c.running = true
 	return nil
@@ -75,8 +77,10 @@ func (c *DefaultCore) Stop() error {
 		return fmt.Errorf("core module is not running")
 	}
 
-	// 停止各组件
-	// TODO: 停止各组件
+	// 停止存储模块
+	if err := c.storage.Stop(); err != nil {
+		return fmt.Errorf("failed to stop storage: %w", err)
+	}
 
 	c.running = false
 	return nil
