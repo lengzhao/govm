@@ -104,7 +104,7 @@ func (bg *DefaultBlockGenerator) BuildBlockHeader(lastBlock *types.Block, transa
 	}
 
 	// 获取当前验证者
-	validator := types.Address{} // 这里应该获取当前应该出块的验证者地址
+	validator := bg.consensus.GetCurrentValidator(blockHeight)
 
 	// 获取时间戳（毫秒）
 	timestamp := uint64(time.Now().UnixMilli())

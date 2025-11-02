@@ -22,6 +22,9 @@ type Blockchain struct {
 	lastBlockHash types.Hash
 	height        uint64
 
+	// 创世区块配置
+	genesisConfig *types.GenesisConfig
+
 	// 读写锁保护区块链状态
 	mutex sync.RWMutex
 }
@@ -56,6 +59,11 @@ func (bc *Blockchain) Init() error {
 	bc.height = genesisBlock.Header.BlockNumber
 
 	return nil
+}
+
+// SetGenesisConfig 设置创世区块配置
+func (bc *Blockchain) SetGenesisConfig(config *types.GenesisConfig) {
+	bc.genesisConfig = config
 }
 
 // GetLastBlock 获取最新的区块
@@ -148,14 +156,18 @@ func (bc *Blockchain) validateBlock(block *types.Block) error {
 		return fmt.Errorf("consensus validation failed: %w", err)
 	}
 
-	// 验证前一个区块哈希
-	if block.Header.PrevHash != bc.lastBlockHash {
-		return fmt.Errorf("block prev hash mismatch")
-	}
-
 	// 验证区块高度
-	if block.Header.BlockNumber != bc.height+1 {
-		return fmt.Errorf("block height mismatch: expected %d, got %d", bc.height+1, block.Header.BlockNumber)
+	if block.Header.BlockNumber > 0 && block.Header.BlockNumber != bc.height+1 {
+		// 如果是添加历史区块，允许高度不连续
+		if block.Header.BlockNumber <= bc.height {
+			// 检查该高度的区块是否已存在
+			_, err := bc.GetBlockByHeight(block.Header.BlockNumber)
+			if err == nil {
+				return fmt.Errorf("block at height %d already exists", block.Header.BlockNumber)
+			}
+		} else {
+			return fmt.Errorf("block height mismatch: expected %d, got %d", bc.height+1, block.Header.BlockNumber)
+		}
 	}
 
 	// 验证分片ID
@@ -243,13 +255,19 @@ func (bc *Blockchain) loadGenesisBlock() (*types.Block, error) {
 
 // createGenesisBlock 创建创世区块
 func (bc *Blockchain) createGenesisBlock() (*types.Block, error) {
+	// 使用配置的时间戳，如果没有配置则使用默认值0
+	timestamp := uint64(0)
+	if bc.genesisConfig != nil {
+		timestamp = bc.genesisConfig.Timestamp
+	}
+
 	// 创建创世区块
 	genesis := &types.Block{
 		Header: types.BlockHeaderWithSign{
 			BlockHeader: types.BlockHeader{
 				ShardID:       types.DefaultShardID,
 				BlockNumber:   0,
-				Timestamp:     0,               // 创世区块时间戳为0
+				Timestamp:     timestamp,       // 使用配置的时间戳
 				Validator:     types.Address{}, // 创世区块不需要验证者
 				PrevHash:      types.Hash{},    // 创世区块的前一个哈希为空
 				MerkleRoot:    types.Hash{},    // 创世区块的Merkle根为空

@@ -15,6 +15,7 @@ import (
 	"github.com/lengzhao/govm/core"
 	"github.com/lengzhao/govm/generator"
 	"github.com/lengzhao/govm/storage"
+	"github.com/lengzhao/govm/sync" // 添加同步模块导入
 	"github.com/lengzhao/govm/types"
 	"github.com/lengzhao/network"
 )
@@ -31,12 +32,18 @@ type ValidatorsConfig struct {
 	Validators []Validator `json:"validators"`
 }
 
+// GenesisConfig 创世区块配置文件结构
+type GenesisConfig struct {
+	Genesis types.GenesisConfig `json:"genesis"`
+}
+
 // 命令行参数
 var (
-	nodeID     = flag.Int("node-id", 1, "Node ID")
-	port       = flag.Int("port", 8000, "Port to listen on")
-	dataDir    = flag.String("data-dir", "./data", "Data directory")
-	configFile = flag.String("config", "./config/validators.json", "Validators configuration file")
+	nodeID      = flag.Int("node-id", 1, "Node ID")
+	port        = flag.Int("port", 8000, "Port to listen on")
+	dataDir     = flag.String("data-dir", "./data", "Data directory")
+	configFile  = flag.String("config", "./config/validators.json", "Validators configuration file")
+	genesisFile = flag.String("genesis", "./config/genesis.json", "Genesis configuration file")
 )
 
 // loadValidatorsFromConfig 从配置文件加载验证节点
@@ -63,6 +70,32 @@ func loadValidatorsFromConfig(configFile string) ([]types.Address, error) {
 	}
 
 	return validators, nil
+}
+
+// loadGenesisConfig 从配置文件加载创世区块配置
+func loadGenesisConfig(genesisFile string) (*types.GenesisConfig, error) {
+	// 检查配置文件是否存在
+	if _, err := os.Stat(genesisFile); os.IsNotExist(err) {
+		// 如果文件不存在，使用默认配置
+		fmt.Printf("Genesis config file not found, using default timestamp\n")
+		return &types.GenesisConfig{
+			Timestamp: uint64(time.Now().Unix()),
+		}, nil
+	}
+
+	// 读取配置文件
+	data, err := os.ReadFile(genesisFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read genesis config file: %w", err)
+	}
+
+	// 解析JSON配置
+	var config GenesisConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse genesis config file: %w", err)
+	}
+
+	return &config.Genesis, nil
 }
 
 func main() {
@@ -105,6 +138,15 @@ func main() {
 		fmt.Printf("验证节点 %d: %x\n", i+1, addr)
 	}
 
+	// 加载创世区块配置
+	genesisConfig, err := loadGenesisConfig(*genesisFile)
+	if err != nil {
+		fmt.Printf("加载创世区块配置失败: %v\n", err)
+		return
+	}
+
+	fmt.Printf("创世区块时间戳: %d\n", genesisConfig.Timestamp)
+
 	// 初始化共识模块
 	config := &consensus.PoAConfig{
 		Validators:    validators,
@@ -117,6 +159,7 @@ func main() {
 	coreConfig := &core.CoreConfig{
 		ShardID: types.DefaultShardID,
 		DataDir: *dataDir,
+		Genesis: genesisConfig, // 传递创世区块配置
 	}
 	coreModule, err := core.NewCore(coreConfig, cons, store)
 	if err != nil {
@@ -130,6 +173,18 @@ func main() {
 		return
 	}
 	defer coreModule.Stop()
+
+	// 初始化同步模块
+	syncer := sync.NewSyncer(coreModule, net, store)
+
+	// 启动同步模块
+	if err := syncer.StartSync(); err != nil {
+		fmt.Printf("同步模块启动失败: %v\n", err)
+		// 不中断程序执行，继续启动其他模块
+	} else {
+		fmt.Println("govm 同步模块已启动")
+	}
+	defer syncer.StopSync()
 
 	// 启动网络模块
 	ctx, cancel := context.WithCancel(context.Background())
@@ -158,7 +213,7 @@ func main() {
 	fmt.Printf("当前节点地址: %x\n", currentNodeAddr)
 
 	// 启动出块循环
-	go startBlockGeneration(coreModule, blockGenerator, cons, net, currentNodeAddr)
+	go startBlockGeneration(coreModule, blockGenerator, cons, net, currentNodeAddr, syncer)
 
 	fmt.Printf("govm 服务已启动 (Node ID: %d, Port: %d)\n", *nodeID, *port)
 
@@ -171,7 +226,7 @@ func main() {
 }
 
 // startBlockGeneration 启动出块循环
-func startBlockGeneration(core core.Core, generator generator.BlockGenerator, cons consensus.PoAConsensus, net network.NetworkInterface, nodeAddr types.Address) {
+func startBlockGeneration(coreModule core.Core, generator generator.BlockGenerator, cons consensus.PoAConsensus, net network.NetworkInterface, nodeAddr types.Address, syncer sync.Syncer) {
 	ticker := time.NewTicker(time.Duration(types.BlockInterval) * time.Millisecond)
 	defer ticker.Stop()
 
@@ -186,7 +241,14 @@ func startBlockGeneration(core core.Core, generator generator.BlockGenerator, co
 			return err
 		}
 		fmt.Printf("Received block: %d\n", block.Header.BlockNumber)
-		err := core.AddBlock(&block)
+
+		// 检查是否正在同步，如果正在同步则不处理新区块
+		if syncer.IsSyncing() {
+			fmt.Printf("Node is syncing, ignoring new block %d\n", block.Header.BlockNumber)
+			return nil
+		}
+
+		err := coreModule.AddBlock(&block)
 		if err != nil {
 			fmt.Printf("添加区块失败: %v\n", err)
 			return err
@@ -196,13 +258,43 @@ func startBlockGeneration(core core.Core, generator generator.BlockGenerator, co
 		return nil
 	})
 
+	// 注册高度请求消息处理器
+	net.RegisterRequestHandler("height_request", func(from string, topic string, data []byte) ([]byte, error) {
+		fmt.Printf("Received height request from %s\n", from)
+
+		// 获取当前节点的高度
+		height := coreModule.GetHeight()
+
+		// 创建高度响应
+		response := &sync.HeightResponse{
+			NodeID: fmt.Sprintf("node-%d", *nodeID),
+			Height: height,
+			Error:  "",
+		}
+
+		// 序列化响应
+		responseData, err := sync.SerializeHeightResponse(response)
+		if err != nil {
+			fmt.Printf("序列化高度响应失败: %v\n", err)
+			return nil, err
+		}
+
+		return responseData, nil
+	})
+
 	fmt.Println("等待10秒以确保网络模块启动...")
 	time.Sleep(10 * time.Second)
 	fmt.Println("开始生成区块")
 
 	for range ticker.C {
+		// 检查是否正在同步，如果正在同步则不生成新区块
+		if syncer.IsSyncing() {
+			fmt.Println("Node is syncing, skipping block generation")
+			continue
+		}
+
 		// 获取最新的区块作为前一个区块
-		lastBlock := core.GetLastBlock()
+		lastBlock := coreModule.GetLastBlock()
 
 		// 计算下一个区块的高度
 		nextBlockHeight := lastBlock.Header.BlockNumber + 1
@@ -223,6 +315,16 @@ func startBlockGeneration(core core.Core, generator generator.BlockGenerator, co
 			continue
 		}
 
+		if block.Header.Timestamp > uint64(time.Now().Add(time.Duration(types.BlockInterval)*time.Millisecond).Unix()*1000) {
+			fmt.Println("需要等待")
+			continue
+		}
+
+		if block.Header.Timestamp < uint64(time.Now().Add(time.Duration(-10)*time.Millisecond).Unix()*1000) {
+			fmt.Println("错误区块时间")
+			continue
+		}
+
 		data, err := binary.Marshal(block)
 		if err != nil {
 			fmt.Printf("序列化区块失败: %v\n", err)
@@ -230,7 +332,7 @@ func startBlockGeneration(core core.Core, generator generator.BlockGenerator, co
 		}
 
 		// 添加区块到区块链
-		if err := core.AddBlock(block); err != nil {
+		if err := coreModule.AddBlock(block); err != nil {
 			fmt.Printf("添加区块失败: %v\n", err)
 			continue
 		}

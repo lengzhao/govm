@@ -15,6 +15,16 @@ echo "Cleaning up previous data..."
 rm -rf node1 node2 node3 config
 mkdir -p node1/data node2/data node3/data node1 node2 node3 config
 
+# 创建创世区块配置文件，设置时间为当前时间+10秒
+GENESIS_TIME=$(($(date +%s) + 10))
+cat > config/genesis.json << EOF
+{
+  "genesis": {
+    "timestamp": $GENESIS_TIME
+  }
+}
+EOF
+
 # 创建3节点验证配置文件
 cat > config/validators.json << 'EOF'
 {
@@ -54,7 +64,7 @@ start_node() {
     mkdir -p node${node_id}
     
     # 启动节点（后台运行）
-    ./govm --node-id=${node_id} --port=${port} --data-dir=${data_dir} --config=./config/validators.json > node${node_id}/stdout.log 2> node${node_id}/stderr.log &
+    ./govm --node-id=${node_id} --port=${port} --data-dir=${data_dir} --config=./config/validators.json --genesis=./config/genesis.json > node${node_id}/stdout.log 2> node${node_id}/stderr.log &
     
     # 保存进程ID
     echo $! > node${node_id}/govm.pid

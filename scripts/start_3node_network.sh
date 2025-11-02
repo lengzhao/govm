@@ -8,7 +8,40 @@ set -e  # 遇到错误时退出
 echo "Starting 3-node blockchain network..."
 
 # 创建数据目录
-mkdir -p node1/data node2/data node3/data
+mkdir -p node1/data node2/data node3/data config
+
+# 创建创世区块配置文件，设置时间为当前时间+10秒
+GENESIS_TIME=$(($(date +%s)*1000 + 10000))
+cat > config/genesis.json << EOF
+{
+  "genesis": {
+    "timestamp": $GENESIS_TIME
+  }
+}
+EOF
+
+# 创建3节点验证配置文件
+cat > config/validators.json << 'EOF'
+{
+  "validators": [
+    {
+      "id": 1,
+      "address": "00000000000000000001",
+      "public_key": ""
+    },
+    {
+      "id": 2,
+      "address": "00000000000000000002",
+      "public_key": ""
+    },
+    {
+      "id": 3,
+      "address": "00000000000000000003",
+      "public_key": ""
+    }
+  ]
+}
+EOF
 
 # 编译程序
 echo "Building govm..."
@@ -23,7 +56,7 @@ start_node() {
     echo "Starting node ${node_id} on port ${port} with data directory ${data_dir}"
     
     # 启动节点（后台运行）
-    ./govm --node-id=${node_id} --port=${port} --data-dir=${data_dir} &
+    ./govm --node-id=${node_id} --port=${port} --data-dir=${data_dir} --config=./config/validators.json --genesis=./config/genesis.json &
     
     # 保存进程ID
     echo $! > node${node_id}/govm.pid

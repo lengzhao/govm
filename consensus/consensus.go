@@ -68,6 +68,9 @@ type PoAConsensus interface {
 
 	// GetCurrentValidator 获取当前应该出块的验证者地址
 	GetCurrentValidator(height uint64) types.Address
+
+	// GetValidatorCount 获取验证者数量
+	GetValidatorCount() int
 }
 
 // DefaultPoA 默认PoA共识实现
@@ -354,13 +357,8 @@ func (p *DefaultPoA) GetValidatorsAtHeight(height uint64) (*ValidatorInfo, error
 	// 从存储中获取验证者信息
 	data, err := p.storage.Get(key)
 	if err != nil {
-		// 获取出块验证节点的公钥
-		validatorIndex := height % uint64(len(p.config.Validators))
-		if validatorIndex >= uint64(len(p.state.Validators)) {
-			return nil, fmt.Errorf("invalid validator index")
-		}
-		validator := p.state.Validators[validatorIndex]
-		return &validator, nil
+		// 如果存储中没有找到验证者信息，返回错误
+		return nil, fmt.Errorf("validator info not found for height %d: %w", height, err)
 	}
 
 	// 反序列化验证者信息
@@ -404,4 +402,9 @@ func (p *DefaultPoA) GetCurrentValidator(height uint64) types.Address {
 	}
 
 	return types.Address{}
+}
+
+// GetValidatorCount 获取验证者数量
+func (p *DefaultPoA) GetValidatorCount() int {
+	return len(p.config.Validators)
 }

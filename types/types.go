@@ -61,6 +61,11 @@ const (
 	ValidatorCount = 21
 )
 
+// GenesisConfig 创世区块配置
+type GenesisConfig struct {
+	Timestamp uint64 `json:"timestamp"` // 创世区块时间戳
+}
+
 // storage namespace
 const (
 	SNBlock      = "1" // key=block.hash

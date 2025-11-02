@@ -27,6 +27,11 @@ func NewCore(config *CoreConfig, consensus consensus.PoAConsensus, storage stora
 	// 创建区块链实例
 	blockchain := NewBlockchain(storage, consensus)
 
+	// 设置创世区块配置
+	if config.Genesis != nil {
+		blockchain.SetGenesisConfig(config.Genesis)
+	}
+
 	// 初始化区块链
 	if err := blockchain.Init(); err != nil {
 		return nil, fmt.Errorf("failed to initialize blockchain: %w", err)
@@ -134,4 +139,9 @@ func (c *DefaultCore) ApplyTransaction(tx *types.TransactionWithSign) error {
 // GetTransactionByHash 根据哈希获取交易
 func (c *DefaultCore) GetTransactionByHash(hash types.Hash) (*types.TransactionWithSign, error) {
 	return c.txProcessor.GetTransactionByHash(hash)
+}
+
+// CalculateBlockHash 计算区块哈希
+func (c *DefaultCore) CalculateBlockHash(block *types.Block) types.Hash {
+	return c.blockchain.CalculateBlockHash(block)
 }

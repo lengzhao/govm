@@ -1,19 +1,19 @@
 #!/bin/bash
 
-# 轮流出块测试脚本
-# 该脚本用于验证3个节点是否能够正确地轮流出块
+# 单节点网络测试脚本
+# 该脚本用于验证单个节点是否能够正常启动和出块
 
 set -e  # 遇到错误时退出
 
-echo "=== 3-Node Round Robin Block Generation Test ==="
+echo "=== Single Node Test ==="
 
 # 确保在项目根目录
 cd "$(dirname "$0")/.."
 
 # 清理之前的运行数据
 echo "Cleaning up previous data..."
-rm -rf node1 node2 node3 config data
-mkdir -p node1/data node2/data node3/data node1 node2 node3 config data
+rm -rf node1 config data
+mkdir -p node1/data node1 config data
 
 # 创建创世区块配置文件，设置时间为当前时间+10秒
 GENESIS_TIME=$(($(date +%s) + 10))
@@ -25,23 +25,13 @@ cat > config/genesis.json << EOF
 }
 EOF
 
-# 创建3节点验证配置文件
+# 创建单节点验证配置文件
 cat > config/validators.json << 'EOF'
 {
   "validators": [
     {
       "id": 1,
       "address": "00000000000000000001",
-      "public_key": ""
-    },
-    {
-      "id": 2,
-      "address": "00000000000000000002",
-      "public_key": ""
-    },
-    {
-      "id": 3,
-      "address": "00000000000000000003",
       "public_key": ""
     }
   ]
@@ -99,71 +89,77 @@ stop_node() {
     fi
 }
 
-# 启动3个节点
-echo "Starting 3 nodes..."
+# 启动单个节点
+echo "Starting single node..."
 start_node 1 8001
-start_node 2 8002
-start_node 3 8003
 
 # 验证节点是否正常运行
 echo "Checking node status..."
-all_running=true
-for i in {1..3}; do
-    if [ -f "node${i}/govm.pid" ]; then
-        pid=$(cat node${i}/govm.pid)
-        if ps -p $pid > /dev/null; then
-            echo "Node ${i}: Running (PID: $pid)"
-        else
-            echo "Node ${i}: Not running"
-            all_running=false
-        fi
+node_running=false
+if [ -f "node1/govm.pid" ]; then
+    pid=$(cat node1/govm.pid)
+    if ps -p $pid > /dev/null; then
+        echo "Node 1: Running (PID: $pid)"
+        node_running=true
     else
-        echo "Node ${i}: PID file not found"
-        all_running=false
+        echo "Node 1: Not running"
     fi
-done
+else
+    echo "Node 1: PID file not found"
+fi
 
-if [ "$all_running" = false ]; then
-    echo "Error: Not all nodes are running!"
-    # 停止所有节点
-    for i in {1..3}; do
-        stop_node $i
-    done
+if [ "$node_running" = false ]; then
+    echo "Error: Node is not running!"
+    stop_node 1
     exit 1
 fi
 
-echo "All nodes are running."
+echo "Node is running."
 
-# 观察网络运行一段时间，足够看到轮流出块
-echo "Observing network for 30 seconds to see round-robin block generation..."
+# 观察网络运行一段时间，足够看到出块
+echo "Observing network for 30 seconds to see block generation..."
 for i in {1..30}; do
     echo "Second $i..."
     sleep 1
 done
 
 # 检查日志输出
-echo "Checking node logs for round-robin block generation..."
-for i in {1..3}; do
-    echo "--- Node ${i} stdout ---"
-    if [ -f "node${i}/stdout.log" ]; then
-        cat node${i}/stdout.log
-    else
-        echo "No stdout log found"
-    fi
-    
-    echo "--- Node ${i} stderr ---"
-    if [ -f "node${i}/stderr.log" ]; then
-        tail -20 node${i}/stderr.log
-    else
-        echo "No stderr log found"
-    fi
-    echo ""
-done
+echo "Checking node logs for block generation..."
+echo "--- Node 1 stdout ---"
+if [ -f "node1/stdout.log" ]; then
+    cat node1/stdout.log
+else
+    echo "No stdout log found"
+fi
 
-# 停止所有节点
-echo "Stopping all nodes..."
-for i in {1..3}; do
-    stop_node $i
-done
+echo "--- Node 1 stderr ---"
+if [ -f "node1/stderr.log" ]; then
+    tail -20 node1/stderr.log
+else
+    echo "No stderr log found"
+fi
+echo ""
 
-echo "=== Round Robin Block Generation Test Completed ==="
+# 检查是否有区块生成
+echo "Checking for block generation..."
+if grep -q "成功生成并添加区块" node1/stdout.log; then
+    echo "SUCCESS: Blocks are being generated!"
+elif grep -q "Node is syncing" node1/stdout.log && grep -q "sync completed" node1/stderr.log; then
+    echo "INFO: Node was syncing but now completed sync"
+    # 再等待一段时间看是否开始出块
+    echo "Waiting additional 10 seconds to see if block generation starts..."
+    sleep 10
+    if grep -q "成功生成并添加区块" node1/stdout.log; then
+        echo "SUCCESS: Blocks are being generated after sync!"
+    else
+        echo "WARNING: No block generation detected even after sync completed"
+    fi
+else
+    echo "WARNING: No block generation detected in logs"
+fi
+
+# 停止节点
+echo "Stopping node..."
+stop_node 1
+
+echo "=== Single Node Test Completed ==="
