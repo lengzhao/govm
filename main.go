@@ -10,12 +10,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/lengzhao/binary"
 	"github.com/lengzhao/govm/consensus"
 	"github.com/lengzhao/govm/core"
 	"github.com/lengzhao/govm/generator"
 	"github.com/lengzhao/govm/storage"
-	"github.com/lengzhao/govm/sync" // 添加同步模块导入
+	"github.com/lengzhao/govm/sync"
+	"github.com/lengzhao/govm/txpool"
 	"github.com/lengzhao/govm/types"
 	"github.com/lengzhao/network"
 )
@@ -174,6 +174,20 @@ func main() {
 	}
 	defer coreModule.Stop()
 
+	// 设置网络接口并注册消息处理器
+	if err := coreModule.SetNetwork(net, *nodeID); err != nil {
+		fmt.Printf("设置网络接口失败: %v\n", err)
+		return
+	}
+
+	// 初始化交易池模块
+	txPool := txpool.NewTxPool(coreModule, store)
+	if err := txPool.Start(); err != nil {
+		fmt.Printf("交易池模块启动失败: %v\n", err)
+		return
+	}
+	defer txPool.Stop()
+
 	// 初始化同步模块
 	syncer := sync.NewSyncer(coreModule, net, store)
 
@@ -199,7 +213,7 @@ func main() {
 	fmt.Println("govm 核心模块已启动")
 
 	// 初始化区块生成器
-	blockGenerator := generator.NewBlockGenerator(cons, store)
+	blockGenerator := generator.NewBlockGenerator(cons, store, txPool)
 
 	// 获取当前节点地址（基于节点ID分配验证者地址）
 	var currentNodeAddr types.Address
@@ -213,7 +227,7 @@ func main() {
 	fmt.Printf("当前节点地址: %x\n", currentNodeAddr)
 
 	// 启动出块循环
-	go startBlockGeneration(coreModule, blockGenerator, cons, net, currentNodeAddr, syncer)
+	go startBlockGeneration(coreModule, blockGenerator, cons, currentNodeAddr, syncer)
 
 	fmt.Printf("govm 服务已启动 (Node ID: %d, Port: %d)\n", *nodeID, *port)
 
@@ -226,121 +240,9 @@ func main() {
 }
 
 // startBlockGeneration 启动出块循环
-func startBlockGeneration(coreModule core.Core, generator generator.BlockGenerator, cons consensus.PoAConsensus, net network.NetworkInterface, nodeAddr types.Address, syncer sync.Syncer) {
-	ticker := time.NewTicker(time.Duration(types.BlockInterval) * time.Millisecond)
-	defer ticker.Stop()
-
-	fmt.Println("出块循环已启动...")
-
-	// 注册新区块消息处理器
-	net.RegisterMessageHandler("new_block", func(from string, topic string, data []byte) error {
-		fmt.Printf("Received new block from %s\n", from)
-		var block types.Block
-		if err := binary.Unmarshal(data, &block); err != nil {
-			fmt.Printf("反序列化区块失败: %v\n", err)
-			return err
-		}
-		fmt.Printf("Received block: %d\n", block.Header.BlockNumber)
-
-		// 检查是否正在同步，如果正在同步则不处理新区块
-		if syncer.IsSyncing() {
-			fmt.Printf("Node is syncing, ignoring new block %d\n", block.Header.BlockNumber)
-			return nil
-		}
-
-		err := coreModule.AddBlock(&block)
-		if err != nil {
-			fmt.Printf("添加区块失败: %v\n", err)
-			return err
-		}
-
-		// 这里应该处理接收到的新区块
-		return nil
-	})
-
-	// 注册高度请求消息处理器
-	net.RegisterRequestHandler("height_request", func(from string, topic string, data []byte) ([]byte, error) {
-		fmt.Printf("Received height request from %s\n", from)
-
-		// 获取当前节点的高度
-		height := coreModule.GetHeight()
-
-		// 创建高度响应
-		response := &sync.HeightResponse{
-			NodeID: fmt.Sprintf("node-%d", *nodeID),
-			Height: height,
-			Error:  "",
-		}
-
-		// 序列化响应
-		responseData, err := sync.SerializeHeightResponse(response)
-		if err != nil {
-			fmt.Printf("序列化高度响应失败: %v\n", err)
-			return nil, err
-		}
-
-		return responseData, nil
-	})
-
-	fmt.Println("等待10秒以确保网络模块启动...")
-	time.Sleep(10 * time.Second)
-	fmt.Println("开始生成区块")
-
-	for range ticker.C {
-		// 检查是否正在同步，如果正在同步则不生成新区块
-		if syncer.IsSyncing() {
-			fmt.Println("Node is syncing, skipping block generation")
-			continue
-		}
-
-		// 获取最新的区块作为前一个区块
-		lastBlock := coreModule.GetLastBlock()
-
-		// 计算下一个区块的高度
-		nextBlockHeight := lastBlock.Header.BlockNumber + 1
-
-		// 检查当前是否轮到本节点出块
-		if !cons.IsMyTurn(nextBlockHeight, nodeAddr) {
-			// 如果不是轮到本节点出块，跳过
-			fmt.Printf("不是轮到本节点出块，跳过 (高度: %d)\n", nextBlockHeight)
-			continue
-		}
-
-		fmt.Printf("轮到本节点出块 (高度: %d)\n", nextBlockHeight)
-
-		// 生成新区块
-		block, err := generator.GenerateBlock(lastBlock)
-		if err != nil {
-			fmt.Printf("生成区块失败: %v\n", err)
-			continue
-		}
-
-		if block.Header.Timestamp > uint64(time.Now().Add(time.Duration(types.BlockInterval)*time.Millisecond).Unix()*1000) {
-			fmt.Println("需要等待")
-			continue
-		}
-
-		if block.Header.Timestamp < uint64(time.Now().Add(time.Duration(-10)*time.Millisecond).Unix()*1000) {
-			fmt.Println("错误区块时间")
-			continue
-		}
-
-		data, err := binary.Marshal(block)
-		if err != nil {
-			fmt.Printf("序列化区块失败: %v\n", err)
-			continue
-		}
-
-		// 添加区块到区块链
-		if err := coreModule.AddBlock(block); err != nil {
-			fmt.Printf("添加区块失败: %v\n", err)
-			continue
-		}
-
-		fmt.Printf("成功生成并添加区块，高度: %d\n", block.Header.BlockNumber)
-
-		// 广播新区块到网络
-		net.BroadcastMessage("new_block", data)
+func startBlockGeneration(coreModule core.Core, generator generator.BlockGenerator, cons consensus.PoAConsensus, nodeAddr types.Address, syncChecker types.SyncChecker) {
+	// 启动区块生成器的出块循环
+	if err := generator.StartBlockGeneration(coreModule, cons, nodeAddr, syncChecker); err != nil {
+		fmt.Printf("启动区块生成循环失败: %v\n", err)
 	}
-
 }

@@ -299,11 +299,7 @@ func (tp *DefaultTxProcessor) updateNonce(addr types.Address, nonce uint64) erro
 
 // calculateTransactionHash 计算交易哈希
 func (tp *DefaultTxProcessor) calculateTransactionHash(tx *types.TransactionWithSign) types.Hash {
-	// 序列化交易（排除签名字段）
-	txCopy := *tx
-	txCopy.Signature = nil
-
-	data, err := lzbinary.Marshal(&txCopy.Transaction)
+	data, err := lzbinary.Marshal(tx.Transaction)
 	if err != nil {
 		return types.Hash{} // 返回空哈希
 	}

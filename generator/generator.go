@@ -9,6 +9,7 @@ import (
 	"github.com/lengzhao/govm/core"
 	"github.com/lengzhao/govm/crypto"
 	"github.com/lengzhao/govm/storage"
+	"github.com/lengzhao/govm/txpool"
 	"github.com/lengzhao/govm/types"
 )
 
@@ -31,6 +32,9 @@ type BlockGenerator interface {
 
 	// BroadcastBlock 广播区块到网络
 	BroadcastBlock(block *types.Block) error
+
+	// StartBlockGeneration 启动区块生成循环
+	StartBlockGeneration(coreModule core.Core, cons consensus.PoAConsensus, nodeAddr types.Address, syncChecker types.SyncChecker) error
 }
 
 // DefaultBlockGenerator 默认区块生成器实现
@@ -38,14 +42,16 @@ type DefaultBlockGenerator struct {
 	consensus consensus.PoAConsensus
 	storage   storage.Storage
 	crypto    crypto.Crypto
+	txPool    txpool.TxPool // 添加交易池引用
 }
 
 // NewBlockGenerator 创建新的区块生成器实例
-func NewBlockGenerator(cons consensus.PoAConsensus, store storage.Storage) BlockGenerator {
+func NewBlockGenerator(cons consensus.PoAConsensus, store storage.Storage, txPool txpool.TxPool) BlockGenerator {
 	return &DefaultBlockGenerator{
 		consensus: cons,
 		storage:   store,
 		crypto:    crypto.NewCrypto(),
+		txPool:    txPool, // 初始化交易池
 	}
 }
 
@@ -79,9 +85,24 @@ func (bg *DefaultBlockGenerator) GenerateBlock(lastBlock *types.Block) (*types.B
 
 // SelectTransactions 从交易池中选择交易
 func (bg *DefaultBlockGenerator) SelectTransactions() ([]*types.Transaction, error) {
-	// 简化实现：暂不从交易池中选择交易
-	// 实际实现中应该从交易池中选择有效的交易
-	return []*types.Transaction{}, nil
+	// 如果没有交易池，返回空交易列表
+	if bg.txPool == nil {
+		return []*types.Transaction{}, nil
+	}
+
+	// 从交易池中选择最多100个交易
+	txWithSigns, err := bg.txPool.SelectTransactions(100)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select transactions from pool: %w", err)
+	}
+
+	// 转换为不带签名的交易列表
+	transactions := make([]*types.Transaction, len(txWithSigns))
+	for i, txWithSign := range txWithSigns {
+		transactions[i] = &txWithSign.Transaction
+	}
+
+	return transactions, nil
 }
 
 // BuildBlockHeader 构建区块头
@@ -200,6 +221,70 @@ func (bg *DefaultBlockGenerator) BroadcastBlock(block *types.Block) error {
 	// 简化实现：暂不实现广播功能
 	// 实际实现中应该将区块广播到网络中的其他节点
 	fmt.Println("Broadcasting block...")
+	return nil
+}
+
+// StartBlockGeneration 启动区块生成循环
+func (bg *DefaultBlockGenerator) StartBlockGeneration(coreModule core.Core, cons consensus.PoAConsensus, nodeAddr types.Address, syncChecker types.SyncChecker) error {
+	ticker := time.NewTicker(time.Duration(types.BlockInterval) * time.Millisecond)
+	defer ticker.Stop()
+
+	// 这里应该注册网络消息处理器，但由于接口限制，暂时不实现
+
+	for range ticker.C {
+		// 检查是否正在同步，如果正在同步则不生成新区块
+		if syncChecker.IsSyncing() {
+			fmt.Println("Node is syncing, skipping block generation")
+			continue
+		}
+
+		// 获取最新的区块作为前一个区块
+		lastBlock := coreModule.GetLastBlock()
+
+		// 计算下一个区块的高度
+		nextBlockHeight := lastBlock.Header.BlockNumber + 1
+
+		// 检查当前是否轮到本节点出块
+		if !cons.IsMyTurn(nextBlockHeight, nodeAddr) {
+			// 如果不是轮到本节点出块，跳过
+			fmt.Printf("不是轮到本节点出块，跳过 (高度: %d)\n", nextBlockHeight)
+			continue
+		}
+
+		fmt.Printf("轮到本节点出块 (高度: %d)\n", nextBlockHeight)
+
+		// 生成新区块
+		block, err := bg.GenerateBlock(lastBlock)
+		if err != nil {
+			fmt.Printf("生成区块失败: %v\n", err)
+			continue
+		}
+
+		if block.Header.Timestamp > uint64(time.Now().Add(time.Duration(types.BlockInterval)*time.Millisecond).Unix()*1000) {
+			fmt.Println("需要等待")
+			continue
+		}
+
+		if block.Header.Timestamp < uint64(time.Now().Add(time.Duration(-10)*time.Millisecond).Unix()*1000) {
+			fmt.Println("错误区块时间")
+			continue
+		}
+
+		// 添加区块到区块链
+		if err := coreModule.AddBlock(block); err != nil {
+			fmt.Printf("添加区块失败: %v\n", err)
+			continue
+		}
+
+		fmt.Printf("成功生成并添加区块，高度: %d\n", block.Header.BlockNumber)
+
+		// 广播新区块到网络
+		if err := bg.BroadcastBlock(block); err != nil {
+			fmt.Printf("广播区块失败: %v\n", err)
+			continue
+		}
+	}
+
 	return nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"github.com/lengzhao/govm/consensus"
 	"github.com/lengzhao/govm/storage"
 	"github.com/lengzhao/govm/types"
+	"github.com/lengzhao/network"
 )
 
 // Core 区块链核心模块接口
@@ -46,6 +47,9 @@ type Core interface {
 
 	// CalculateBlockHash 计算区块哈希
 	CalculateBlockHash(block *types.Block) types.Hash
+
+	// SetNetwork 设置网络接口并注册消息处理器
+	SetNetwork(net network.NetworkInterface, nodeID int) error
 }
 
 // CoreConfig 核心模块配置
