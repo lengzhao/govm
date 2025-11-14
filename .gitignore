@@ -35,3 +35,4 @@ build/
 govm
 node*/
 config/
+*.log

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lengzhao/binary"
 	"github.com/lengzhao/govm/core"
 	"github.com/lengzhao/govm/storage"
 	"github.com/lengzhao/govm/types"
@@ -180,16 +181,64 @@ func (s *DefaultSyncer) getNetworkHeight() (uint64, error) {
 		return localHeight, nil
 	}
 
-	// 在多节点环境中，我们应该通过网络请求获取其他节点的高度
-	// 而不是基于时间计算理论高度
-
-	// 如果本地高度为0（创世区块），我们返回一个较小的值
-	if localHeight == 0 {
-		return 10, nil
+	// 获取连接的节点列表
+	peers := s.network.GetPeers()
+	if len(peers) == 0 {
+		// 没有连接的节点，返回本地高度
+		return localHeight, nil
 	}
 
-	// 否则返回本地高度加上一个小的增量
-	return localHeight + 10, nil
+	// 创建高度请求
+	heightRequest := &HeightRequest{
+		NodeID: "requester", // 请求节点ID
+	}
+
+	// 序列化请求
+	requestData, err := SerializeHeightRequest(heightRequest)
+	if err != nil {
+		return 0, fmt.Errorf("failed to serialize height request: %w", err)
+	}
+
+	// 记录最大高度
+	maxHeight := localHeight
+
+	// 向所有连接的节点发送高度请求
+	for _, peer := range peers {
+		// 发送请求并等待响应
+		responseData, err := s.network.SendRequest(peer, "height_request", requestData)
+		if err != nil {
+			slog.Warn("failed to send height request to peer", "peer", peer, "error", err)
+			continue
+		}
+
+		// 反序列化响应
+		// 注意：这里我们使用与core模块中定义的兼容结构体来避免循环依赖
+		var response struct {
+			NodeID string // 响应节点ID
+			Height uint64 // 区块链高度
+			Error  string // 错误信息
+		}
+
+		if err := binary.Unmarshal(responseData, &response); err != nil {
+			slog.Warn("failed to unmarshal height response", "peer", peer, "error", err)
+			continue
+		}
+
+		// 检查响应中的错误
+		if response.Error != "" {
+			slog.Warn("height response contains error", "peer", peer, "error", response.Error)
+			continue
+		}
+
+		// 更新最大高度
+		if response.Height > maxHeight {
+			maxHeight = response.Height
+		}
+
+		slog.Info("received height from peer", "peer", peer, "height", response.Height)
+	}
+
+	return maxHeight, nil
 }
 
 // requestBlocks 请求区块数据

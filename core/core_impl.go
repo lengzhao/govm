@@ -212,7 +212,7 @@ func (c *DefaultCore) registerNetworkHandlers() error {
 		// 获取当前节点的高度
 		height := c.GetHeight()
 
-		// 创建高度响应
+		// 创建高度响应（使用与sync.HeightResponse相同的结构以保持兼容性）
 		response := &struct {
 			NodeID string // 响应节点ID
 			Height uint64 // 区块链高度

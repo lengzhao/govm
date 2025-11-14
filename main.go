@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lengzhao/govm/api"
 	"github.com/lengzhao/govm/consensus"
 	"github.com/lengzhao/govm/core"
 	"github.com/lengzhao/govm/generator"
@@ -39,8 +40,8 @@ type GenesisConfig struct {
 
 // 命令行参数
 var (
-	nodeID      = flag.Int("node-id", 1, "Node ID")
-	port        = flag.Int("port", 8000, "Port to listen on")
+	nodeID      = flag.Int("node-id", 2, "Node ID")
+	port        = flag.Int("port", 0, "Port to listen on")
 	dataDir     = flag.String("data-dir", "./data", "Data directory")
 	configFile  = flag.String("config", "./config/validators.json", "Validators configuration file")
 	genesisFile = flag.String("genesis", "./config/genesis.json", "Genesis configuration file")
@@ -200,6 +201,16 @@ func main() {
 	}
 	defer syncer.StopSync()
 
+	// 初始化API模块
+	apiServer := api.NewAPI(coreModule, txPool, store, net)
+	if err := apiServer.Start(); err != nil {
+		fmt.Printf("API模块启动失败: %v\n", err)
+		// 不中断程序执行，继续启动其他模块
+	} else {
+		fmt.Println("govm API模块已启动")
+	}
+	defer apiServer.Stop()
+
 	// 启动网络模块
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -219,15 +230,19 @@ func main() {
 	var currentNodeAddr types.Address
 	if *nodeID <= len(validators) {
 		currentNodeAddr = validators[*nodeID-1]
-	} else {
-		// 如果节点ID超出验证节点数量，使用循环分配
-		currentNodeAddr = validators[(*nodeID-1)%len(validators)]
 	}
+	// 如果节点ID超出验证节点数量，不分配验证者地址（空地址）
+	// 非验证节点不应该参与出块
 
 	fmt.Printf("当前节点地址: %x\n", currentNodeAddr)
 
-	// 启动出块循环
-	go startBlockGeneration(coreModule, blockGenerator, cons, currentNodeAddr, syncer)
+	// 启动出块循环（只有验证节点才启动出块循环）
+	if *nodeID <= len(validators) {
+		go startBlockGeneration(coreModule, blockGenerator, cons, currentNodeAddr, syncer)
+		fmt.Println("当前节点是验证节点，启动出块循环")
+	} else {
+		fmt.Println("当前节点是非验证节点，不启动出块循环")
+	}
 
 	fmt.Printf("govm 服务已启动 (Node ID: %d, Port: %d)\n", *nodeID, *port)
 

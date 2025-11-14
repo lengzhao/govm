@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/http"
+
 	"github.com/lengzhao/govm/types"
 )
 
@@ -13,7 +15,7 @@ type API interface {
 	Stop() error
 
 	// RegisterEndpoints 注册API端点
-	RegisterEndpoints()
+	RegisterEndpoints(mux *http.ServeMux)
 
 	// GetBlockByHash 根据哈希获取区块
 	GetBlockByHash(hash types.Hash) (*types.Block, error)
@@ -35,6 +37,9 @@ type API interface {
 
 	// GetPeers 获取节点列表
 	GetPeers() ([]NodeInfo, error)
+
+	// SetPort 设置API服务端口
+	SetPort(port string)
 }
 
 // WalletAPI 钱包API接口

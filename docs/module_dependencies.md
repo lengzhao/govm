@@ -156,7 +156,7 @@ graph TD
 - **generator为core提供**: 生成的新区块通过core的[AddBlock](file:///Volumes/ssd/myproject/govm/core/core.go#L27-L27)方法添加到区块链
 
 ### core ↔ sync
-- **core为sync提供**: 区块链数据访问([GetBlockByHeight](file:///Volumes/ssd/myproject/govm/core/core.go#L25-L25), [AddBlock](file:///Volumes/ssd/myproject/govm/core/core.go#L27-L27)等)
+- **core为sync提供**: 区块链数据访问([GetBlockByHeight](file:///Volumes/ssd/myproject/govm/core/core.go#L25-L25), [AddBlock](file:///Volumes/ssd/myproject/govm/core/core.go#L27-L27)等)和共识信息([GetConsensus](file:///Volumes/ssd/myproject/govm/core/core.go#L15-L15))
 - **sync为core提供**: 网络同步功能，保持节点间数据一致性
 
 ### txpool ↔ generator
@@ -168,7 +168,7 @@ graph TD
 - **generator为consensus提供**: 无直接提供
 
 ### sync ↔ network
-- **network为sync提供**: P2P网络通信功能
+- **network为sync提供**: P2P网络通信功能，包括点对点请求([SendRequest](file:///Volumes/ssd/myproject/govm/sync/sync_impl.go#L201-L201))
 - **sync为network提供**: 网络消息处理器注册
 
 ### core ↔ network
@@ -179,12 +179,19 @@ graph TD
 
 为了解决sync和generator模块之间的循环依赖问题，我们引入了接口隔离：
 
-1. 在[types模块](file:///Volumes/ssd/myproject/govm/types)中定义了`SyncChecker`接口，只包含[IsSyncing() bool](file:///Volumes/ssd/myproject/govm/sync/sync.go#L36-L36)方法
+1. 在[types模块](file:///Volumes/ssd/myproject/govm/types)中定义了`SyncChecker`接口，只包含[IsSyncing() bool](file:///Volumes/ssd/myproject/govm/sync/sync.go#L41-L41)方法
 2. [sync模块](file:///Volumes/ssd/myproject/govm/sync)实现了`Syncer`接口，其中包含了`SyncChecker`接口
 3. [generator模块](file:///Volumes/ssd/myproject/govm/generator)只依赖`SyncChecker`接口，而不是直接依赖[sync模块](file:///Volumes/ssd/myproject/govm/sync)
-4. [main模块](file:///Volumes/ssd/myproject/govm/main.go)中将[sync.Syncer](file:///Volumes/ssd/myproject/govm/sync/sync.go#L32-L36)实例传递给generator，利用Go语言的隐式接口实现
+4. [main模块](file:///Volumes/ssd/myproject/govm/main.go)中将[sync.Syncer](file:///Volumes/ssd/myproject/govm/sync/sync.go#L30-L42)实例传递给generator，利用Go语言的隐式接口实现
 
 这种设计遵循了依赖倒置原则，避免了模块间的直接循环依赖。
+
+## 网络通信优化
+
+sync模块已优化网络通信方式：
+1. 使用点对点请求([SendRequest](file:///Volumes/ssd/myproject/govm/sync/sync_impl.go#L201-L201))替代广播方式请求数据
+2. 直接向验证节点发送同步请求，提高通信效率
+3. 通过共识模块获取验证节点列表，确保请求发送给正确的节点
 
 ## 模块初始化顺序
 

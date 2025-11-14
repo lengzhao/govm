@@ -2,7 +2,7 @@
   "validators": [
     {
       "id": 1,
-      "address": "00000000000000000001",
+      "address": "node1",
       "public_key": ""
     }
   ]
