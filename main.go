@@ -42,6 +42,7 @@ type GenesisConfig struct {
 var (
 	nodeID      = flag.Int("node-id", 2, "Node ID")
 	port        = flag.Int("port", 0, "Port to listen on")
+	apiPort     = flag.Int("api-port", 8080, "API port to listen on")
 	dataDir     = flag.String("data-dir", "./data", "Data directory")
 	configFile  = flag.String("config", "./config/validators.json", "Validators configuration file")
 	genesisFile = flag.String("genesis", "./config/genesis.json", "Genesis configuration file")
@@ -203,11 +204,12 @@ func main() {
 
 	// 初始化API模块
 	apiServer := api.NewAPI(coreModule, txPool, store, net)
+	apiServer.SetPort(fmt.Sprintf(":%d", *apiPort))
 	if err := apiServer.Start(); err != nil {
 		fmt.Printf("API模块启动失败: %v\n", err)
 		// 不中断程序执行，继续启动其他模块
 	} else {
-		fmt.Println("govm API模块已启动")
+		fmt.Printf("govm API模块已启动，端口: %d\n", *apiPort)
 	}
 	defer apiServer.Stop()
 

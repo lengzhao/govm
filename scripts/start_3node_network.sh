@@ -56,7 +56,8 @@ start_node() {
     echo "Starting node ${node_id} on port ${port} with data directory ${data_dir}"
     
     # 启动节点（后台运行）
-    ./govm --node-id=${node_id} --port=${port} --data-dir=${data_dir} --config=./config/validators.json --genesis=./config/genesis.json &
+    api_port=$((8080 + node_id))
+    ./govm --node-id=${node_id} --port=${port} --api-port=${api_port} --data-dir=${data_dir} --config=./config/validators.json --genesis=./config/genesis.json &
     
     # 保存进程ID
     echo $! > node${node_id}/govm.pid

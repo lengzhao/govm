@@ -42,6 +42,9 @@ type Syncer interface {
 	IsSyncing() bool
 }
 
+// 确保DefaultSyncer实现了SyncChecker接口
+var _ types.SyncChecker = (*DefaultSyncer)(nil)
+
 // SyncRequest 同步请求消息
 type SyncRequest struct {
 	StartHeight uint64 // 起始区块高度

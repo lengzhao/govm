@@ -83,11 +83,13 @@ func (a *DefaultAPI) SetPort(port string) {
 func (a *DefaultAPI) RegisterEndpoints(mux *http.ServeMux) {
 	mux.HandleFunc("/block/hash/", a.getBlockByHashHandler)
 	mux.HandleFunc("/block/number/", a.getBlockByNumberHandler)
+	mux.HandleFunc("/blockchain/height", a.getBlockchainHeightHandler)
+	mux.HandleFunc("/blockchain/latest/hash", a.getLatestBlockHashHandler)
 	mux.HandleFunc("/transaction/", a.getTransactionHandler)
 	mux.HandleFunc("/transaction/send", a.sendTransactionHandler)
 	mux.HandleFunc("/account/balance/", a.getBalanceHandler)
 	mux.HandleFunc("/node/info", a.getNodeInfoHandler)
-	mux.HandleFunc("/node/peers", a.getPeersHandler)
+	mux.HandleFunc("/network/peers", a.getPeersHandler)
 }
 
 // getBlockByHashHandler 根据哈希获取区块
@@ -268,6 +270,44 @@ func (a *DefaultAPI) getPeersHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(peers)
+}
+
+// getBlockchainHeightHandler 获取区块链高度
+func (a *DefaultAPI) getBlockchainHeightHandler(w http.ResponseWriter, r *http.Request) {
+	// 获取当前区块高度
+	height := a.core.GetHeight()
+
+	// 返回区块高度
+	response := map[string]interface{}{
+		"height": height,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// getLatestBlockHashHandler 获取最新区块哈希
+func (a *DefaultAPI) getLatestBlockHashHandler(w http.ResponseWriter, r *http.Request) {
+	// 获取最新区块
+	latestBlock := a.core.GetLastBlock()
+	if latestBlock == nil {
+		http.Error(w, "no blocks found", http.StatusNotFound)
+		return
+	}
+
+	// 计算区块哈希
+	data, err := json.Marshal(latestBlock.Header.BlockHeader)
+	if err != nil {
+		http.Error(w, "failed to marshal block header", http.StatusInternalServerError)
+		return
+	}
+	blockHash := a.crypto.Hash(data)
+
+	// 返回区块哈希
+	response := map[string]interface{}{
+		"hash": fmt.Sprintf("%x", blockHash),
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 // GetBlockByHash 根据哈希获取区块

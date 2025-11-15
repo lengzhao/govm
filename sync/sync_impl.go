@@ -107,6 +107,12 @@ func (s *DefaultSyncer) IsSyncing() bool {
 	s.stateMu.RLock()
 	defer s.stateMu.RUnlock()
 
+	// 检查验证者数量，如果是单节点环境，直接返回false
+	validatorCount := s.core.GetConsensus().GetValidatorCount()
+	if validatorCount <= 1 {
+		return false
+	}
+
 	return s.state.Status == SyncStatusSyncing || s.state.Status == SyncStatusStarting
 }
 
@@ -134,6 +140,17 @@ func (s *DefaultSyncer) performSync() error {
 	localHeight := s.core.GetHeight()
 	slog.Info("checking sync status", "local_height", localHeight)
 
+	// 检查验证者数量
+	validatorCount := s.core.GetConsensus().GetValidatorCount()
+
+	// 如果只有一个验证者，说明是单节点环境，直接标记为同步完成
+	if validatorCount <= 1 {
+		if s.GetSyncState().Status != SyncStatusComplete {
+			s.updateState(SyncStatusComplete, localHeight, "sync completed (single node)")
+		}
+		return nil
+	}
+
 	// 获取网络中其他节点的最新区块高度
 	targetHeight, err := s.getNetworkHeight()
 	if err != nil {
@@ -144,13 +161,6 @@ func (s *DefaultSyncer) performSync() error {
 
 	// 如果本地高度已经跟上网络高度，则不需要同步
 	if localHeight >= targetHeight {
-		// 检查验证者数量，如果是单节点环境，直接标记为同步完成
-		validatorCount := s.core.GetConsensus().GetValidatorCount()
-		if validatorCount <= 1 {
-			s.updateState(SyncStatusComplete, targetHeight, "sync completed (single node)")
-			return nil
-		}
-
 		if s.GetSyncState().Status == SyncStatusSyncing {
 			s.updateState(SyncStatusComplete, targetHeight, "sync completed")
 		}
