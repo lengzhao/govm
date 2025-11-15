@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 
 	lzbinary "github.com/lengzhao/binary"
@@ -135,6 +136,7 @@ func (bc *Blockchain) AddBlock(block *types.Block) error {
 	if err := bc.validateBlock(block); err != nil {
 		return fmt.Errorf("block validation failed: %w", err)
 	}
+	slog.Info("adding block", "height", block.Header.BlockNumber, "Validator", block.Header.Validator)
 
 	// 将区块存储到数据库
 	if err := bc.storeBlock(block); err != nil {

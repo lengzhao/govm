@@ -2,12 +2,12 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 
-	"github.com/lengzhao/binary"
 	"github.com/lengzhao/govm/core"
 	"github.com/lengzhao/govm/storage"
 	"github.com/lengzhao/govm/types"
@@ -113,6 +113,7 @@ func (s *DefaultSyncer) IsSyncing() bool {
 		return false
 	}
 
+	// 只有在同步中或启动中状态才返回true，空闲状态不应该阻止出块
 	return s.state.Status == SyncStatusSyncing || s.state.Status == SyncStatusStarting
 }
 
@@ -161,7 +162,8 @@ func (s *DefaultSyncer) performSync() error {
 
 	// 如果本地高度已经跟上网络高度，则不需要同步
 	if localHeight >= targetHeight {
-		if s.GetSyncState().Status == SyncStatusSyncing {
+		// 如果当前状态不是完成状态，则更新为完成状态
+		if s.GetSyncState().Status != SyncStatusComplete {
 			s.updateState(SyncStatusComplete, targetHeight, "sync completed")
 		}
 		return nil
@@ -224,12 +226,12 @@ func (s *DefaultSyncer) getNetworkHeight() (uint64, error) {
 		// 反序列化响应
 		// 注意：这里我们使用与core模块中定义的兼容结构体来避免循环依赖
 		var response struct {
-			NodeID string // 响应节点ID
-			Height uint64 // 区块链高度
-			Error  string // 错误信息
+			NodeID string `json:"node_id"`
+			Height uint64 `json:"height"`
+			Error  string `json:"error"`
 		}
 
-		if err := binary.Unmarshal(responseData, &response); err != nil {
+		if err := json.Unmarshal(responseData, &response); err != nil {
 			slog.Warn("failed to unmarshal height response", "peer", peer, "error", err)
 			continue
 		}

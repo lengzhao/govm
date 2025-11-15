@@ -11,7 +11,7 @@ echo "Starting 3-node blockchain network..."
 mkdir -p node1/data node2/data node3/data config
 
 # 创建创世区块配置文件，设置时间为当前时间+10秒
-GENESIS_TIME=$(($(date +%s)*1000 + 10000))
+GENESIS_TIME=$(($(date +%s) + 10))
 cat > config/genesis.json << EOF
 {
   "genesis": {

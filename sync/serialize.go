@@ -1,9 +1,9 @@
 package sync
 
 import (
+	"encoding/json"
 	"fmt"
 
-	"github.com/lengzhao/binary"
 	"github.com/lengzhao/govm/types"
 )
 
@@ -13,7 +13,7 @@ func SerializeSyncRequest(req *SyncRequest) ([]byte, error) {
 		return nil, fmt.Errorf("sync request is nil")
 	}
 
-	return binary.Marshal(req)
+	return json.Marshal(req)
 }
 
 // DeserializeSyncRequest 反序列化同步请求
@@ -23,7 +23,7 @@ func DeserializeSyncRequest(data []byte) (*SyncRequest, error) {
 	}
 
 	var req SyncRequest
-	if err := binary.Unmarshal(data, &req); err != nil {
+	if err := json.Unmarshal(data, &req); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal sync request: %w", err)
 	}
 
@@ -36,7 +36,7 @@ func SerializeSyncResponse(resp *SyncResponse) ([]byte, error) {
 		return nil, fmt.Errorf("sync response is nil")
 	}
 
-	return binary.Marshal(resp)
+	return json.Marshal(resp)
 }
 
 // DeserializeSyncResponse 反序列化同步响应
@@ -46,7 +46,7 @@ func DeserializeSyncResponse(data []byte) (*SyncResponse, error) {
 	}
 
 	var resp SyncResponse
-	if err := binary.Unmarshal(data, &resp); err != nil {
+	if err := json.Unmarshal(data, &resp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal sync response: %w", err)
 	}
 
@@ -59,7 +59,7 @@ func SerializeBlock(block *types.Block) ([]byte, error) {
 		return nil, fmt.Errorf("block is nil")
 	}
 
-	return binary.Marshal(block)
+	return json.Marshal(block)
 }
 
 // DeserializeBlock 反序列化区块
@@ -69,7 +69,7 @@ func DeserializeBlock(data []byte) (*types.Block, error) {
 	}
 
 	var block types.Block
-	if err := binary.Unmarshal(data, &block); err != nil {
+	if err := json.Unmarshal(data, &block); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal block: %w", err)
 	}
 
@@ -118,7 +118,7 @@ func SerializeHeightRequest(req *HeightRequest) ([]byte, error) {
 		return nil, fmt.Errorf("height request is nil")
 	}
 
-	return binary.Marshal(req)
+	return json.Marshal(req)
 }
 
 // DeserializeHeightRequest 反序列化高度请求
@@ -128,7 +128,7 @@ func DeserializeHeightRequest(data []byte) (*HeightRequest, error) {
 	}
 
 	var req HeightRequest
-	if err := binary.Unmarshal(data, &req); err != nil {
+	if err := json.Unmarshal(data, &req); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal height request: %w", err)
 	}
 
@@ -141,7 +141,7 @@ func SerializeHeightResponse(resp *HeightResponse) ([]byte, error) {
 		return nil, fmt.Errorf("height response is nil")
 	}
 
-	return binary.Marshal(resp)
+	return json.Marshal(resp)
 }
 
 // DeserializeHeightResponse 反序列化高度响应
@@ -151,7 +151,7 @@ func DeserializeHeightResponse(data []byte) (*HeightResponse, error) {
 	}
 
 	var resp HeightResponse
-	if err := binary.Unmarshal(data, &resp); err != nil {
+	if err := json.Unmarshal(data, &resp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal height response: %w", err)
 	}
 

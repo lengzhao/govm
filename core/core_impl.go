@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -212,11 +213,11 @@ func (c *DefaultCore) registerNetworkHandlers() error {
 		// 获取当前节点的高度
 		height := c.GetHeight()
 
-		// 创建高度响应（使用与sync.HeightResponse相同的结构以保持兼容性）
+		// 创建高度响应（使用与sync.HeightResponse兼容的结构）
 		response := &struct {
-			NodeID string // 响应节点ID
-			Height uint64 // 区块链高度
-			Error  string // 错误信息
+			NodeID string `json:"node_id"`
+			Height uint64 `json:"height"`
+			Error  string `json:"error"`
 		}{
 			NodeID: fmt.Sprintf("node-%d", c.nodeID),
 			Height: height,
@@ -224,7 +225,7 @@ func (c *DefaultCore) registerNetworkHandlers() error {
 		}
 
 		// 序列化响应
-		responseData, err := binary.Marshal(response)
+		responseData, err := json.Marshal(response)
 		if err != nil {
 			fmt.Printf("序列化高度响应失败: %v\n", err)
 			return nil, err
