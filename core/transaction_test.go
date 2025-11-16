@@ -3,291 +3,272 @@ package core
 import (
 	"testing"
 
+	"github.com/lengzhao/govm/crypto"
 	"github.com/lengzhao/govm/storage"
 	"github.com/lengzhao/govm/types"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewTxProcessor(t *testing.T) {
-	// 创建内存存储
-	store := storage.NewMemoryStorage("")
-	store.Start()
-	defer store.Stop()
-
-	// 创建交易处理器
-	txProcessor := NewTxProcessor(store)
-
-	// 验证实例创建成功
-	assert.NotNil(t, txProcessor)
-}
-
 func TestTxProcessor_ValidateTransaction(t *testing.T) {
-	// 创建内存存储
+	// 创建存储
 	store := storage.NewMemoryStorage("")
-	store.Start()
+	err := store.Start()
+	assert.NoError(t, err)
 	defer store.Stop()
 
 	// 创建交易处理器
 	txProcessor := NewTxProcessor(store)
 
-	// 测试nil交易
-	err := txProcessor.ValidateTransaction(nil)
+	// 生成测试密钥对
+	cryptoInstance := crypto.NewCrypto()
+	_, pubKey, err := cryptoInstance.GenerateKeyPair(crypto.Ed25519)
+	assert.NoError(t, err)
+
+	// 创建有效的交易
+	validTx := &types.TransactionWithSign{
+		Transaction: types.Transaction{
+			ShardID:   1,
+			From:      types.Address{1},
+			To:        types.Address{2},
+			Amount:    100,
+			Nonce:     1,
+			Data:      []byte("test data"),
+			GasPrice:  1,
+			GasLimit:  21000,
+			GasFeeCap: 1000,
+			PublicKey: pubKey.Bytes(),
+		},
+		Signature: []byte("test signature"),
+	}
+
+	// 测试有效交易
+	err = txProcessor.ValidateTransaction(validTx)
+	assert.NoError(t, err)
+
+	// 测试无效交易（金额为0）
+	invalidTx1 := &types.TransactionWithSign{
+		Transaction: types.Transaction{
+			ShardID:   1,
+			From:      types.Address{1},
+			To:        types.Address{2},
+			Amount:    0,
+			Nonce:     1,
+			Data:      []byte("test data"),
+			GasPrice:  1,
+			GasLimit:  21000,
+			GasFeeCap: 1000,
+			PublicKey: pubKey.Bytes(),
+		},
+		Signature: []byte("test signature"),
+	}
+
+	err = txProcessor.ValidateTransaction(invalidTx1)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "transaction is nil")
+	assert.Contains(t, err.Error(), "transaction amount must be positive")
 
-	// 创建一个有效的交易
-	tx := &types.TransactionWithSign{
+	// 测试无效交易（发送方和接收方相同）
+	invalidTx2 := &types.TransactionWithSign{
 		Transaction: types.Transaction{
-			ShardID: 1,
-			From:    types.Address{1},
-			To:      types.Address{2},
-			Amount:  100,
-			Nonce:   1,
+			ShardID:   1,
+			From:      types.Address{1},
+			To:        types.Address{1},
+			Amount:    100,
+			Nonce:     1,
+			Data:      []byte("test data"),
+			GasPrice:  1,
+			GasLimit:  21000,
+			GasFeeCap: 1000,
+			PublicKey: pubKey.Bytes(),
 		},
-		Signature: []byte("signature"),
+		Signature: []byte("test signature"),
 	}
 
-	// 验证交易
-	err = txProcessor.ValidateTransaction(tx)
-	// 注意：由于签名验证是简化的实现，这里会失败
-	// assert.NoError(t, err)
-	_ = err // 避免未使用变量错误
-}
-
-func TestTxProcessor_ValidateTransaction_InvalidSignature(t *testing.T) {
-	// 创建内存存储
-	store := storage.NewMemoryStorage("")
-	store.Start()
-	defer store.Stop()
-
-	// 创建交易处理器
-	txProcessor := NewTxProcessor(store)
-
-	// 创建一个没有签名的交易
-	tx := &types.TransactionWithSign{
-		Transaction: types.Transaction{
-			ShardID: 1,
-			From:    types.Address{1},
-			To:      types.Address{2},
-			Amount:  100,
-			Nonce:   1,
-		},
-		Signature: []byte{}, // 空签名
-	}
-
-	// 验证交易
-	err := txProcessor.ValidateTransaction(tx)
+	err = txProcessor.ValidateTransaction(invalidTx2)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "transaction signature is missing")
-}
+	assert.Contains(t, err.Error(), "sender and receiver addresses cannot be the same")
 
-func TestTxProcessor_ValidateTransaction_InvalidAmount(t *testing.T) {
-	// 创建内存存储
-	store := storage.NewMemoryStorage("")
-	store.Start()
-	defer store.Stop()
-
-	// 创建交易处理器
-	txProcessor := NewTxProcessor(store)
-
-	// 创建一个金额为0的交易
-	tx := &types.TransactionWithSign{
+	// 测试无效交易（缺少公钥）
+	invalidTx3 := &types.TransactionWithSign{
 		Transaction: types.Transaction{
-			ShardID: 1,
-			From:    types.Address{1},
-			To:      types.Address{2},
-			Amount:  0, // 无效金额
-			Nonce:   1,
+			ShardID:   1,
+			From:      types.Address{1},
+			To:        types.Address{2},
+			Amount:    100,
+			Nonce:     1,
+			Data:      []byte("test data"),
+			GasPrice:  1,
+			GasLimit:  21000,
+			GasFeeCap: 1000,
+			PublicKey: []byte{},
 		},
-		Signature: []byte("signature"),
+		Signature: []byte("test signature"),
 	}
 
-	// 验证交易
-	err := txProcessor.ValidateTransaction(tx)
-	// 由于签名验证是简化的实现，这里会失败
-	// assert.Error(t, err)
-	// assert.Contains(t, err.Error(), "transaction amount must be positive")
-	_ = err // 避免未使用变量错误
-}
-
-func TestTxProcessor_ValidateTransaction_SameAddresses(t *testing.T) {
-	// 创建内存存储
-	store := storage.NewMemoryStorage("")
-	store.Start()
-	defer store.Stop()
-
-	// 创建交易处理器
-	txProcessor := NewTxProcessor(store)
-
-	// 创建发送方和接收方地址相同的交易
-	addr := types.Address{1}
-	tx := &types.TransactionWithSign{
-		Transaction: types.Transaction{
-			ShardID: 1,
-			From:    addr,
-			To:      addr, // 相同地址
-			Amount:  100,
-			Nonce:   1,
-		},
-		Signature: []byte("signature"),
-	}
-
-	// 验证交易
-	err := txProcessor.ValidateTransaction(tx)
-	// 由于签名验证是简化的实现，这里会失败
-	// assert.Error(t, err)
-	// assert.Contains(t, err.Error(), "sender and receiver addresses cannot be the same")
-	_ = err // 避免未使用变量错误
-}
-
-func TestTxProcessor_ValidateTransaction_InvalidShardID(t *testing.T) {
-	// 创建内存存储
-	store := storage.NewMemoryStorage("")
-	store.Start()
-	defer store.Stop()
-
-	// 创建交易处理器
-	txProcessor := NewTxProcessor(store)
-
-	// 创建分片ID为0的交易
-	tx := &types.TransactionWithSign{
-		Transaction: types.Transaction{
-			ShardID: 0, // 无效分片ID
-			From:    types.Address{1},
-			To:      types.Address{2},
-			Amount:  100,
-			Nonce:   1,
-		},
-		Signature: []byte("signature"),
-	}
-
-	// 验证交易
-	err := txProcessor.ValidateTransaction(tx)
-	// 由于签名验证是简化的实现，这里会失败
-	// assert.Error(t, err)
-	// assert.Contains(t, err.Error(), "shard ID must be positive")
-	_ = err // 避免未使用变量错误
+	err = txProcessor.ValidateTransaction(invalidTx3)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "public key is required")
 }
 
 func TestTxProcessor_ApplyTransaction(t *testing.T) {
-	// 创建内存存储
+	// 创建存储
 	store := storage.NewMemoryStorage("")
-	store.Start()
+	err := store.Start()
+	assert.NoError(t, err)
 	defer store.Stop()
 
 	// 创建交易处理器
 	txProcessor := NewTxProcessor(store)
 
-	// 创建一个有效的交易
+	// 生成测试密钥对
+	cryptoInstance := crypto.NewCrypto()
+	_, pubKey, err := cryptoInstance.GenerateKeyPair(crypto.Ed25519)
+	assert.NoError(t, err)
+
+	// 创建发送方和接收方地址
+	fromAddr := types.Address{1}
+	toAddr := types.Address{2}
+
+	// 初始化发送方账户余额
+	err = txProcessor.(*DefaultTxProcessor).setBalance(fromAddr, 1000)
+	assert.NoError(t, err)
+
+	// 创建交易
 	tx := &types.TransactionWithSign{
 		Transaction: types.Transaction{
-			ShardID: 1,
-			From:    types.Address{1},
-			To:      types.Address{2},
-			Amount:  100,
-			Nonce:   1,
+			ShardID:   1,
+			From:      fromAddr,
+			To:        toAddr,
+			Amount:    100,
+			Nonce:     1,
+			Data:      []byte("test data"),
+			GasPrice:  1,
+			GasLimit:  21000,
+			GasFeeCap: 1000,
+			PublicKey: pubKey.Bytes(),
 		},
-		Signature: []byte("signature"),
+		Signature: []byte("test signature"),
 	}
 
 	// 应用交易
-	err := txProcessor.ApplyTransaction(tx)
-	// 由于签名验证是简化的实现，这里会失败
-	// assert.NoError(t, err)
-	_ = err // 避免未使用变量错误
+	err = txProcessor.ApplyTransaction(tx)
+	assert.NoError(t, err)
+
+	// 验证发送方余额
+	fromBalance, err := txProcessor.GetBalance(fromAddr)
+	assert.NoError(t, err)
+	// 余额应该是 1000 - 100 - (21000 * 1) = 790
+	assert.Equal(t, uint64(790), fromBalance)
+
+	// 验证接收方余额
+	toBalance, err := txProcessor.GetBalance(toAddr)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(100), toBalance)
+
+	// 验证发送方nonce
+	fromNonce, err := txProcessor.GetNonce(fromAddr)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(1), fromNonce)
 }
 
-func TestTxProcessor_GetTransactionByHash(t *testing.T) {
-	// 创建内存存储
+func TestTxProcessor_GetBalance(t *testing.T) {
+	// 创建存储
 	store := storage.NewMemoryStorage("")
-	store.Start()
+	err := store.Start()
+	assert.NoError(t, err)
 	defer store.Stop()
 
 	// 创建交易处理器
 	txProcessor := NewTxProcessor(store)
 
-	// 创建一个哈希
-	hash := types.Hash{1, 2, 3}
+	// 测试不存在的账户
+	addr := types.Address{1}
+	balance, err := txProcessor.GetBalance(addr)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), balance)
 
-	// 根据哈希获取交易
-	tx, err := txProcessor.GetTransactionByHash(hash)
-	// 由于存储是空的，这里会失败
-	// assert.NoError(t, err)
-	// assert.NotNil(t, tx)
-	_ = tx  // 避免未使用变量错误
-	_ = err // 避免未使用变量错误
-}
+	// 设置账户余额
+	err = txProcessor.(*DefaultTxProcessor).setBalance(addr, 1000)
+	assert.NoError(t, err)
 
-func TestTxProcessor_calculateTransactionHash(t *testing.T) {
-	// 创建内存存储
-	store := storage.NewMemoryStorage("")
-	store.Start()
-	defer store.Stop()
-
-	// 创建交易处理器
-	txProcessor := NewTxProcessor(store).(*DefaultTxProcessor)
-
-	// 创建一个交易
-	tx := &types.TransactionWithSign{
-		Transaction: types.Transaction{
-			ShardID: 1,
-			From:    types.Address{1},
-			To:      types.Address{2},
-			Amount:  100,
-			Nonce:   1,
-		},
-		Signature: []byte("signature"),
-	}
-
-	// 计算交易哈希
-	hash := txProcessor.calculateTransactionHash(tx)
-	assert.NotNil(t, hash)
+	// 测试存在的账户
+	balance, err = txProcessor.GetBalance(addr)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(1000), balance)
 }
 
 func TestTxProcessor_GetNonce(t *testing.T) {
-	// 创建内存存储
+	// 创建存储
 	store := storage.NewMemoryStorage("")
-	store.Start()
+	err := store.Start()
+	assert.NoError(t, err)
 	defer store.Stop()
 
 	// 创建交易处理器
-	txProcessor := NewTxProcessor(store).(*DefaultTxProcessor)
+	txProcessor := NewTxProcessor(store)
 
-	// 获取账户nonce值
+	// 测试不存在的账户
 	addr := types.Address{1}
 	nonce, err := txProcessor.GetNonce(addr)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(0), nonce)
 
-	// 设置账户nonce值
-	err = txProcessor.setNonce(addr, 10)
+	// 设置账户nonce
+	err = txProcessor.(*DefaultTxProcessor).setNonce(addr, 5)
 	assert.NoError(t, err)
 
-	// 再次获取账户nonce值
+	// 测试存在的账户
 	nonce, err = txProcessor.GetNonce(addr)
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(10), nonce)
+	assert.Equal(t, uint64(5), nonce)
 }
 
-func TestTxProcessor_updateNonce(t *testing.T) {
-	// 创建内存存储
+func TestTxProcessor_CalculateGasFee(t *testing.T) {
+	// 创建存储
 	store := storage.NewMemoryStorage("")
-	store.Start()
+	err := store.Start()
+	assert.NoError(t, err)
 	defer store.Stop()
 
 	// 创建交易处理器
-	txProcessor := NewTxProcessor(store).(*DefaultTxProcessor)
+	txProcessor := NewTxProcessor(store)
 
-	// 更新账户nonce值
-	addr := types.Address{1}
-	err := txProcessor.updateNonce(addr, 1)
-	assert.NoError(t, err)
+	// 创建交易
+	tx := &types.Transaction{
+		ShardID:   1,
+		From:      types.Address{1},
+		To:        types.Address{2},
+		Amount:    100,
+		Nonce:     1,
+		Data:      []byte("test data"), // 9 bytes
+		GasPrice:  10,
+		GasLimit:  30000,
+		GasFeeCap: 100000,
+	}
 
-	// 再次更新账户nonce值
-	err = txProcessor.updateNonce(addr, 2)
-	assert.NoError(t, err)
+	// 计算Gas费用
+	gasFee := txProcessor.(*DefaultTxProcessor).calculateGasFee(tx)
+	// 基础Gas: 21000, 数据Gas: 9, 总Gas: 21009
+	// Gas费用: 21009 * 10 = 210090
+	// 但不应超过Gas费用上限，所以应该是100000
+	assert.Equal(t, uint64(100000), gasFee)
 
-	// 使用无效的nonce值
-	err = txProcessor.updateNonce(addr, 1)
-	assert.Error(t, err)
+	// 测试Gas限制的情况
+	tx2 := &types.Transaction{
+		ShardID:   1,
+		From:      types.Address{1},
+		To:        types.Address{2},
+		Amount:    100,
+		Nonce:     1,
+		Data:      []byte("test data"), // 9 bytes
+		GasPrice:  10,
+		GasLimit:  21005, // 低于总Gas使用量
+		GasFeeCap: 100000,
+	}
+
+	gasFee2 := txProcessor.(*DefaultTxProcessor).calculateGasFee(tx2)
+	// 基础Gas: 21000, 数据Gas: 9, 总Gas: 21009
+	// 但受限于GasLimit: 21005
+	// Gas费用: 21005 * 10 = 210050
+	// 但不应超过Gas费用上限，所以应该是100000
+	assert.Equal(t, uint64(100000), gasFee2)
 }

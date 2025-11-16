@@ -196,8 +196,12 @@ func (s *DefaultSyncer) getNetworkHeight() (uint64, error) {
 	// 获取连接的节点列表
 	peers := s.network.GetPeers()
 	if len(peers) == 0 {
-		// 没有连接的节点，返回本地高度
-		return localHeight, nil
+		// 没有连接的节点，尝试连接到已知的验证节点
+		peers = s.connectToValidators()
+		if len(peers) == 0 {
+			// 仍然没有连接的节点，返回本地高度
+			return localHeight, nil
+		}
 	}
 
 	// 创建高度请求
@@ -272,10 +276,9 @@ func (s *DefaultSyncer) requestBlocks(startHeight, endHeight uint64) error {
 	// 广播同步请求
 	s.network.BroadcastMessage("sync_request", requestData)
 
-	// 简化实现：直接生成一些测试区块
 	// 在实际实现中，应该等待其他节点响应
-	// 这里我们直接生成区块来模拟同步完成
-	go s.generateTestBlocks(startHeight, endHeight)
+	// 这里我们等待一段时间让其他节点处理请求并发送响应
+	time.Sleep(2 * time.Second)
 
 	return nil
 }
@@ -357,6 +360,34 @@ func (s *DefaultSyncer) updateState(status SyncStatus, targetHeight uint64, erro
 	slog.Info("sync state updated", "status", status, "target_height", targetHeight)
 }
 
+// connectToValidators 连接到已知的验证节点
+func (s *DefaultSyncer) connectToValidators() []string {
+	// 获取验证者列表
+	validators := s.core.GetConsensus().GetValidators()
+	if len(validators) == 0 {
+		return []string{}
+	}
+
+	// 尝试连接到每个验证节点
+	connectedPeers := make([]string, 0)
+	for _, validator := range validators {
+		// 注意：这是一个简化的实现，在实际应用中需要从验证者信息中获取网络地址
+		// 这里我们假设验证者的ID就是网络地址
+		validatorAddr := fmt.Sprintf("%v", validator)
+
+		// 尝试连接到验证节点
+		if err := s.network.ConnectToPeer(validatorAddr); err != nil {
+			slog.Warn("failed to connect to validator", "validator", validatorAddr, "error", err)
+			continue
+		}
+
+		connectedPeers = append(connectedPeers, validatorAddr)
+		slog.Info("connected to validator", "validator", validatorAddr)
+	}
+
+	return connectedPeers
+}
+
 // handleSyncRequest 处理同步请求
 func (s *DefaultSyncer) handleSyncRequest(from string, topic string, data []byte) error {
 	slog.Info("received sync request", "from", from)
@@ -432,6 +463,13 @@ func (s *DefaultSyncer) handleSyncResponse(from string, topic string, data []byt
 			continue
 		}
 
+		// 检查区块是否已经存在于区块链中
+		if existingBlock, _ := s.core.GetBlockByHeight(block.Header.BlockNumber); existingBlock != nil {
+			// 如果区块已经存在，跳过
+			slog.Info("block already exists", "height", block.Header.BlockNumber)
+			continue
+		}
+
 		// 添加区块到区块链
 		if err := s.core.AddBlock(block); err != nil {
 			slog.Error("failed to add block", "height", block.Header.BlockNumber, "error", err)
@@ -443,6 +481,12 @@ func (s *DefaultSyncer) handleSyncResponse(from string, topic string, data []byt
 
 		// 更新同步状态
 		s.updateState(SyncStatusSyncing, s.state.TargetHeight, "")
+	}
+
+	// 如果所有区块都已同步完成，更新状态
+	localHeight := s.core.GetHeight()
+	if localHeight >= s.state.TargetHeight {
+		s.updateState(SyncStatusComplete, localHeight, "sync completed")
 	}
 
 	return nil

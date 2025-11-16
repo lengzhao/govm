@@ -32,6 +32,12 @@ type API interface {
 	// GetBalance 获取余额
 	GetBalance(address types.Address) (uint64, error)
 
+	// GetAccount 获取账户信息
+	GetAccount(address types.Address) (*types.Account, error)
+
+	// CreateAccount 创建账户
+	CreateAccount() (types.Address, error)
+
 	// GetNodeInfo 获取节点信息
 	GetNodeInfo() (NodeInfo, error)
 

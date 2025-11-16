@@ -4,164 +4,266 @@ import (
 	"testing"
 	"time"
 
-	lzbinary "github.com/lengzhao/binary"
 	"github.com/lengzhao/govm/consensus"
-	"github.com/lengzhao/govm/crypto"
 	"github.com/lengzhao/govm/storage"
 	"github.com/lengzhao/govm/types"
 	"github.com/stretchr/testify/assert"
 )
 
-func createTestStorage() storage.Storage {
-	// 创建内存存储用于测试
-	memStorage := storage.NewMemoryStorage("test")
-	memStorage.Start()
-	return memStorage
-}
+func TestBlockchain_Init(t *testing.T) {
+	// 创建存储
+	store := storage.NewMemoryStorage("")
+	err := store.Start()
+	assert.NoError(t, err)
+	defer store.Stop()
 
-func createTestConsensus() consensus.PoAConsensus {
-	// 创建验证节点地址列表
-	validators := make([]types.Address, 1)
-	var addr types.Address
-	copy(addr[:], []byte("test-validator"))
-	validators[0] = addr
-
-	// 创建PoA配置
+	// 创建共识模块
 	config := &consensus.PoAConfig{
-		Validators:    validators,
+		Validators:    []types.Address{{1}, {2}, {3}},
 		BlockInterval: 2000,
-		RoundLength:   1,
+		RoundLength:   3,
 	}
+	cons := consensus.NewPoAConsensus(config, store)
 
-	// 创建存储实例
-	store := createTestStorage()
-
-	// 创建PoA共识实例
-	return consensus.NewPoAConsensus(config, store)
-}
-
-func TestBlockchainInit(t *testing.T) {
-	// 创建存储实例
-	store := createTestStorage()
-
-	// 创建共识实例
-	cons := createTestConsensus()
-
-	// 创建区块链实例
+	// 创建区块链
 	blockchain := NewBlockchain(store, cons)
 
 	// 初始化区块链
-	err := blockchain.Init()
+	err = blockchain.Init()
 	assert.NoError(t, err)
 
-	// 验证创世区块是否创建
+	// 验证创世区块已创建
 	lastBlock := blockchain.GetLastBlock()
 	assert.NotNil(t, lastBlock)
 	assert.Equal(t, uint64(0), lastBlock.Header.BlockNumber)
+	assert.Equal(t, types.DefaultShardID, lastBlock.Header.ShardID)
 }
 
-func TestAddBlock(t *testing.T) {
-	// 创建存储实例
-	store := createTestStorage()
+func TestBlockchain_AddBlock(t *testing.T) {
+	// 创建存储
+	store := storage.NewMemoryStorage("")
+	err := store.Start()
+	assert.NoError(t, err)
+	defer store.Stop()
 
-	// 创建共识实例
-	cons := createTestConsensus()
+	// 创建共识模块
+	config := &consensus.PoAConfig{
+		Validators:    []types.Address{{1}, {2}, {3}},
+		BlockInterval: 2000,
+		RoundLength:   3,
+	}
+	cons := consensus.NewPoAConsensus(config, store)
 
-	// 创建区块链实例
+	// 创建区块链
 	blockchain := NewBlockchain(store, cons)
 
 	// 初始化区块链
-	err := blockchain.Init()
+	err = blockchain.Init()
 	assert.NoError(t, err)
 
-	// 创建一个有效的区块
-	cryptoInstance := crypto.NewCrypto()
-	privKey, _, err := cryptoInstance.GenerateKeyPair(crypto.Ed25519)
-	assert.NoError(t, err)
-
-	// 创建区块头
-	header := &types.BlockHeader{
-		ShardID:     types.DefaultShardID,
-		BlockNumber: 1,
-		Timestamp:   uint64(time.Now().UnixNano() / 1000000), // 毫秒时间戳
-		Validator:   types.Address{},                         // 简化实现
-		PrevHash:    types.Hash{},                            // 简化实现
-		MerkleRoot:  types.Hash{},
-		OtherShards: [3]types.Hash{},
-	}
-
-	// 序列化区块头用于签名
-	data, err := lzbinary.Marshal(header)
-	assert.NoError(t, err)
-
-	// 签名区块头
-	signature, err := cryptoInstance.Sign(data, privKey)
-	assert.NoError(t, err)
-
-	headerWithSign := &types.BlockHeaderWithSign{
-		BlockHeader: *header,
-		Signature:   signature,
-	}
-
-	// 创建完整区块
-	block := &types.Block{
-		Header:       *headerWithSign,
+	// 创建新区块
+	newBlock := &types.Block{
+		Header: types.BlockHeaderWithSign{
+			BlockHeader: types.BlockHeader{
+				ShardID:       types.DefaultShardID,
+				BlockNumber:   1,
+				Timestamp:     uint64(time.Now().UnixMilli()),
+				Validator:     types.Address{1},
+				PrevHash:      blockchain.lastBlockHash,
+				MerkleRoot:    types.Hash{},
+				StateRootHash: types.Hash{},
+				OtherShards:   [3]types.Hash{},
+			},
+			Signature: []byte("test signature"),
+		},
 		Transactions: []types.Hash{},
 	}
 
-	// 添加区块到区块链
-	err = blockchain.AddBlock(block)
-	// 由于简化实现，验证可能会失败，但我们主要测试接口
-	// assert.NoError(t, err)
-	_ = err // 避免未使用变量错误
+	// 添加区块
+	err = blockchain.AddBlock(newBlock)
+	assert.NoError(t, err)
+
+	// 验证区块已添加
+	lastBlock := blockchain.GetLastBlock()
+	assert.NotNil(t, lastBlock)
+	assert.Equal(t, uint64(1), lastBlock.Header.BlockNumber)
+	assert.Equal(t, newBlock.Header.BlockNumber, lastBlock.Header.BlockNumber)
 }
 
-func TestGetBlockByHeight(t *testing.T) {
-	// 创建存储实例
-	store := createTestStorage()
+func TestBlockchain_GetBlockByHash(t *testing.T) {
+	// 创建存储
+	store := storage.NewMemoryStorage("")
+	err := store.Start()
+	assert.NoError(t, err)
+	defer store.Stop()
 
-	// 创建共识实例
-	cons := createTestConsensus()
+	// 创建共识模块
+	config := &consensus.PoAConfig{
+		Validators:    []types.Address{{1}, {2}, {3}},
+		BlockInterval: 2000,
+		RoundLength:   3,
+	}
+	cons := consensus.NewPoAConsensus(config, store)
 
-	// 创建区块链实例
+	// 创建区块链
 	blockchain := NewBlockchain(store, cons)
 
 	// 初始化区块链
-	err := blockchain.Init()
+	err = blockchain.Init()
 	assert.NoError(t, err)
 
-	// 获取创世区块
+	// 获取创世区块哈希
+	genesisHash := blockchain.lastBlockHash
+
+	// 通过哈希获取区块
+	block, err := blockchain.GetBlockByHash(genesisHash)
+	assert.NoError(t, err)
+	assert.NotNil(t, block)
+	assert.Equal(t, uint64(0), block.Header.BlockNumber)
+}
+
+func TestBlockchain_GetBlockByHeight(t *testing.T) {
+	// 创建存储
+	store := storage.NewMemoryStorage("")
+	err := store.Start()
+	assert.NoError(t, err)
+	defer store.Stop()
+
+	// 创建共识模块
+	config := &consensus.PoAConfig{
+		Validators:    []types.Address{{1}, {2}, {3}},
+		BlockInterval: 2000,
+		RoundLength:   3,
+	}
+	cons := consensus.NewPoAConsensus(config, store)
+
+	// 创建区块链
+	blockchain := NewBlockchain(store, cons)
+
+	// 初始化区块链
+	err = blockchain.Init()
+	assert.NoError(t, err)
+
+	// 通过高度获取区块
 	block, err := blockchain.GetBlockByHeight(0)
 	assert.NoError(t, err)
 	assert.NotNil(t, block)
 	assert.Equal(t, uint64(0), block.Header.BlockNumber)
 }
 
-func TestGetBlockByHash(t *testing.T) {
-	// 创建存储实例
-	store := createTestStorage()
+func TestBlockchain_CalculateBlockHash(t *testing.T) {
+	// 创建存储
+	store := storage.NewMemoryStorage("")
+	err := store.Start()
+	assert.NoError(t, err)
+	defer store.Stop()
 
-	// 创建共识实例
-	cons := createTestConsensus()
+	// 创建共识模块
+	config := &consensus.PoAConfig{
+		Validators:    []types.Address{{1}, {2}, {3}},
+		BlockInterval: 2000,
+		RoundLength:   3,
+	}
+	cons := consensus.NewPoAConsensus(config, store)
 
-	// 创建区块链实例
+	// 创建区块链
 	blockchain := NewBlockchain(store, cons)
 
 	// 初始化区块链
-	err := blockchain.Init()
+	err = blockchain.Init()
 	assert.NoError(t, err)
 
-	// 获取创世区块
-	genesisBlock := blockchain.GetLastBlock()
-	assert.NotNil(t, genesisBlock)
+	// 创建测试区块
+	testBlock := &types.Block{
+		Header: types.BlockHeaderWithSign{
+			BlockHeader: types.BlockHeader{
+				ShardID:       types.DefaultShardID,
+				BlockNumber:   1,
+				Timestamp:     uint64(time.Now().UnixMilli()),
+				Validator:     types.Address{1},
+				PrevHash:      blockchain.lastBlockHash,
+				MerkleRoot:    types.Hash{},
+				StateRootHash: types.Hash{},
+				OtherShards:   [3]types.Hash{},
+			},
+			Signature: []byte("test signature"),
+		},
+		Transactions: []types.Hash{},
+	}
 
-	// 创建区块链实例用于计算哈希
-	testBlockchain := NewBlockchain(store, cons)
-	blockHash := testBlockchain.calculateBlockHash(genesisBlock)
+	// 计算区块哈希
+	hash := blockchain.CalculateBlockHash(testBlock)
+	assert.NotEqual(t, types.Hash{}, hash)
 
-	// 根据哈希获取区块
-	block, err := blockchain.GetBlockByHash(blockHash)
+	// 验证哈希一致性
+	hash2 := blockchain.CalculateBlockHash(testBlock)
+	assert.Equal(t, hash, hash2)
+}
+
+func TestBlockchain_ValidateBlock(t *testing.T) {
+	// 创建存储
+	store := storage.NewMemoryStorage("")
+	err := store.Start()
 	assert.NoError(t, err)
-	assert.NotNil(t, block)
-	assert.Equal(t, uint64(0), block.Header.BlockNumber)
+	defer store.Stop()
+
+	// 创建共识模块
+	config := &consensus.PoAConfig{
+		Validators:    []types.Address{{1}, {2}, {3}},
+		BlockInterval: 2000,
+		RoundLength:   3,
+	}
+	cons := consensus.NewPoAConsensus(config, store)
+
+	// 创建区块链
+	blockchain := NewBlockchain(store, cons)
+
+	// 初始化区块链
+	err = blockchain.Init()
+	assert.NoError(t, err)
+
+	// 创建有效的区块
+	validBlock := &types.Block{
+		Header: types.BlockHeaderWithSign{
+			BlockHeader: types.BlockHeader{
+				ShardID:       types.DefaultShardID,
+				BlockNumber:   1,
+				Timestamp:     uint64(time.Now().UnixMilli()),
+				Validator:     types.Address{1},
+				PrevHash:      blockchain.lastBlockHash,
+				MerkleRoot:    types.Hash{},
+				StateRootHash: types.Hash{},
+				OtherShards:   [3]types.Hash{},
+			},
+			Signature: []byte{}, // 空区块签名
+		},
+		Transactions: []types.Hash{},
+	}
+
+	// 验证有效区块
+	err = blockchain.validateBlock(validBlock)
+	assert.NoError(t, err)
+
+	// 创建无效区块（错误的分片ID）
+	invalidBlock := &types.Block{
+		Header: types.BlockHeaderWithSign{
+			BlockHeader: types.BlockHeader{
+				ShardID:       999, // 错误的分片ID
+				BlockNumber:   1,
+				Timestamp:     uint64(time.Now().UnixMilli()),
+				Validator:     types.Address{1},
+				PrevHash:      blockchain.lastBlockHash,
+				MerkleRoot:    types.Hash{},
+				StateRootHash: types.Hash{},
+				OtherShards:   [3]types.Hash{},
+			},
+			Signature: []byte{}, // 空区块签名
+		},
+		Transactions: []types.Hash{},
+	}
+
+	// 验证无效区块
+	err = blockchain.validateBlock(invalidBlock)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "block shard ID mismatch")
 }

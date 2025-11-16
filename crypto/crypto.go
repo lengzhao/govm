@@ -12,6 +12,7 @@ import (
 	"os"
 
 	"github.com/lengzhao/govm/types"
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/scrypt"
 )
 
@@ -32,6 +33,21 @@ type Crypto interface {
 
 	// GenerateAddress generates an address from the given public key.
 	GenerateAddress(publicKey PublicKey) types.Address
+
+	// GenerateRandomBytes generates cryptographically secure random bytes.
+	GenerateRandomBytes(length int) ([]byte, error)
+
+	// HashPassword securely hashes a password using bcrypt.
+	HashPassword(password string) (string, error)
+
+	// VerifyPassword verifies a password against a hash.
+	VerifyPassword(password, hash string) bool
+
+	// EncryptConfig encrypts configuration data.
+	EncryptConfig(data []byte, password string) ([]byte, error)
+
+	// DecryptConfig decrypts configuration data.
+	DecryptConfig(encryptedData []byte, password string) ([]byte, error)
 }
 
 // PrivateKey represents a private key interface.
@@ -289,6 +305,86 @@ func LoadFromFile(filename string, password string) (PrivateKey, error) {
 		return nil, fmt.Errorf("failed to generate %s private key: %w", encryptedKeyFile.Type, err)
 	}
 	return priv.FromBytes(privateKeyBytes)
+}
+
+// GenerateRandomBytes generates cryptographically secure random bytes.
+func (c *DefaultCrypto) GenerateRandomBytes(length int) ([]byte, error) {
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+	return bytes, nil
+}
+
+// HashPassword securely hashes a password using bcrypt.
+func (c *DefaultCrypto) HashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("failed to hash password: %w", err)
+	}
+	return string(hash), nil
+}
+
+// VerifyPassword verifies a password against a hash.
+func (c *DefaultCrypto) VerifyPassword(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
+// EncryptConfig encrypts configuration data.
+func (c *DefaultCrypto) EncryptConfig(data []byte, password string) ([]byte, error) {
+	// Generate a random salt
+	salt := make([]byte, 32)
+	if _, err := rand.Read(salt); err != nil {
+		return nil, fmt.Errorf("failed to generate salt: %w", err)
+	}
+
+	// Derive key from password
+	key, err := deriveKey(password, salt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive key: %w", err)
+	}
+
+	// Encrypt data
+	ciphertext, nonce, err := encryptData(data, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt data: %w", err)
+	}
+
+	// Combine salt, nonce, and ciphertext
+	result := make([]byte, 0, len(salt)+len(nonce)+len(ciphertext))
+	result = append(result, salt...)
+	result = append(result, nonce...)
+	result = append(result, ciphertext...)
+
+	return result, nil
+}
+
+// DecryptConfig decrypts configuration data.
+func (c *DefaultCrypto) DecryptConfig(encryptedData []byte, password string) ([]byte, error) {
+	// Extract salt, nonce, and ciphertext
+	if len(encryptedData) < 32+12 {
+		return nil, fmt.Errorf("encrypted data is too short")
+	}
+
+	salt := encryptedData[:32]
+	nonce := encryptedData[32:44]
+	ciphertext := encryptedData[44:]
+
+	// Derive key from password and salt
+	key, err := deriveKey(password, salt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive key: %w", err)
+	}
+
+	// Decrypt data
+	plaintext, err := decryptData(ciphertext, nonce, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt data: %w", err)
+	}
+
+	return plaintext, nil
 }
 
 // NewCrypto creates a new instance of the default crypto implementation.

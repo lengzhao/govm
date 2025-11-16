@@ -25,6 +25,15 @@ type TxProcessor interface {
 
 	// GetNonce 获取账户nonce值
 	GetNonce(addr types.Address) (uint64, error)
+
+	// GetAccount 获取账户信息
+	GetAccount(addr types.Address) (*types.Account, error)
+
+	// CreateAccount 创建新账户
+	CreateAccount(addr types.Address, pubKey []byte) error
+
+	// UpdateAccount 更新账户信息
+	UpdateAccount(account *types.Account) error
 }
 
 // DefaultTxProcessor 默认交易处理器实现
@@ -74,11 +83,20 @@ func (tp *DefaultTxProcessor) verifyTransactionSignature(tx *types.Transaction, 
 		return fmt.Errorf("failed to marshal transaction: %w", err)
 	}
 
-	// 注意：这是一个简化的实现，在实际应用中，我们需要从交易的发送方地址推导出公钥
-	// 或者交易中直接包含公钥信息。这里我们创建一个新的密钥对仅用于演示
+	// 从交易中获取公钥
+	if len(tx.PublicKey) == 0 {
+		return fmt.Errorf("public key is missing in transaction")
+	}
+
+	// 从字节数据创建公钥对象
 	_, pubKey, err := tp.crypto.GenerateKeyPair(crypto.Ed25519)
 	if err != nil {
 		return fmt.Errorf("failed to generate key pair: %w", err)
+	}
+
+	pubKey, err = pubKey.FromBytes(tx.PublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to reconstruct public key from bytes: %w", err)
 	}
 
 	// 验证签名
@@ -106,6 +124,28 @@ func (tp *DefaultTxProcessor) validateTransactionFields(tx *types.Transaction) e
 		return fmt.Errorf("shard ID must be positive")
 	}
 
+	// 检查Gas相关字段
+	if tx.GasPrice <= 0 {
+		return fmt.Errorf("gas price must be positive")
+	}
+
+	if tx.GasLimit <= 0 {
+		return fmt.Errorf("gas limit must be positive")
+	}
+
+	if tx.GasFeeCap <= 0 {
+		return fmt.Errorf("gas fee cap must be positive")
+	}
+
+	if tx.GasPrice > tx.GasFeeCap {
+		return fmt.Errorf("gas price cannot exceed gas fee cap")
+	}
+
+	// 检查公钥字段
+	if len(tx.PublicKey) == 0 {
+		return fmt.Errorf("public key is required")
+	}
+
 	// 可以添加更多验证规则
 
 	return nil
@@ -118,18 +158,22 @@ func (tp *DefaultTxProcessor) ApplyTransaction(tx *types.TransactionWithSign) er
 		return fmt.Errorf("transaction validation failed: %w", err)
 	}
 
+	// 计算Gas费用
+	gasFee := tp.calculateGasFee(&tx.Transaction)
+
 	// 应用交易到状态数据库
-	// 1. 从发送方账户扣除金额
+	// 1. 从发送方账户扣除金额和Gas费用
 	fromBalance, err := tp.GetBalance(tx.From)
 	if err != nil {
 		fromBalance = 0 // 如果账户不存在，余额为0
 	}
 
-	if fromBalance < tx.Amount {
-		return fmt.Errorf("insufficient balance: %d < %d", fromBalance, tx.Amount)
+	totalDeduction := tx.Amount + gasFee
+	if fromBalance < totalDeduction {
+		return fmt.Errorf("insufficient balance: %d < %d (amount: %d + gas fee: %d)", fromBalance, totalDeduction, tx.Amount, gasFee)
 	}
 
-	if err := tp.setBalance(tx.From, fromBalance-tx.Amount); err != nil {
+	if err := tp.setBalance(tx.From, fromBalance-totalDeduction); err != nil {
 		return fmt.Errorf("failed to update sender balance: %w", err)
 	}
 
@@ -305,4 +349,88 @@ func (tp *DefaultTxProcessor) calculateTransactionHash(tx *types.TransactionWith
 	}
 
 	return tp.crypto.Hash(data)
+}
+
+// calculateGasFee 计算交易的Gas费用
+func (tp *DefaultTxProcessor) calculateGasFee(tx *types.Transaction) uint64 {
+	// 基础Gas费用
+	baseGas := uint64(21000)
+
+	// 数据Gas费用（每字节1单位Gas）
+	dataGas := uint64(len(tx.Data))
+
+	// 计算总Gas使用量
+	gasUsed := baseGas + dataGas
+
+	// 确保不超过Gas限制
+	if gasUsed > tx.GasLimit {
+		gasUsed = tx.GasLimit
+	}
+
+	// 计算Gas费用
+	gasFee := gasUsed * tx.GasPrice
+
+	// 确保不超过Gas费用上限
+	if gasFee > tx.GasFeeCap {
+		gasFee = tx.GasFeeCap
+	}
+
+	return gasFee
+}
+
+// GetAccount 获取账户信息
+func (tp *DefaultTxProcessor) GetAccount(addr types.Address) (*types.Account, error) {
+	// 获取账户余额
+	balance, err := tp.GetBalance(addr)
+	if err != nil {
+		balance = 0
+	}
+
+	// 获取账户nonce值
+	nonce, err := tp.GetNonce(addr)
+	if err != nil {
+		nonce = 0
+	}
+
+	// 创建账户对象
+	account := &types.Account{
+		Address:    addr,
+		Balance:    balance,
+		Nonce:      nonce,
+		PublicKey:  nil, // 公钥需要从其他地方获取
+		CodeHash:   types.Hash{},
+		IsContract: false,
+	}
+
+	return account, nil
+}
+
+// CreateAccount 创建新账户
+func (tp *DefaultTxProcessor) CreateAccount(addr types.Address, pubKey []byte) error {
+	// 初始化账户余额为0
+	if err := tp.setBalance(addr, 0); err != nil {
+		return fmt.Errorf("failed to initialize account balance: %w", err)
+	}
+
+	// 初始化账户nonce为0
+	if err := tp.setNonce(addr, 0); err != nil {
+		return fmt.Errorf("failed to initialize account nonce: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateAccount 更新账户信息
+func (tp *DefaultTxProcessor) UpdateAccount(account *types.Account) error {
+	// 更新账户余额
+	if err := tp.setBalance(account.Address, account.Balance); err != nil {
+		return fmt.Errorf("failed to update account balance: %w", err)
+	}
+
+	// 更新账户nonce值
+	if err := tp.setNonce(account.Address, account.Nonce); err != nil {
+		return fmt.Errorf("failed to update account nonce: %w", err)
+	}
+
+	return nil
 }

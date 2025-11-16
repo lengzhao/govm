@@ -32,12 +32,16 @@ type BlockHeaderWithSign struct {
 
 // Transaction 交易结构
 type Transaction struct {
-	ShardID uint64  // 分片ID
-	From    Address // 发送方地址
-	To      Address // 接收方地址
-	Amount  uint64  // 转账金额
-	Nonce   uint64  // 防重放攻击 nonce
-	Data    []byte  // 数据
+	ShardID   uint64  // 分片ID
+	From      Address // 发送方地址
+	To        Address // 接收方地址
+	Amount    uint64  // 转账金额
+	Nonce     uint64  // 防重放攻击 nonce
+	Data      []byte  // 数据
+	GasPrice  uint64  // Gas价格
+	GasLimit  uint64  // Gas限制
+	GasFeeCap uint64  // Gas费用上限
+	PublicKey []byte  // 发送方公钥
 }
 
 // Transaction 交易结构
@@ -64,6 +68,16 @@ const (
 // GenesisConfig 创世区块配置
 type GenesisConfig struct {
 	Timestamp uint64 `json:"timestamp"` // 创世区块时间戳
+}
+
+// Account 账户结构
+type Account struct {
+	Address    Address `json:"address"`     // 账户地址
+	Balance    uint64  `json:"balance"`     // 账户余额
+	Nonce      uint64  `json:"nonce"`       // nonce值
+	PublicKey  []byte  `json:"public_key"`  // 公钥
+	CodeHash   Hash    `json:"code_hash"`   // 合约代码哈希（如果有的话）
+	IsContract bool    `json:"is_contract"` // 是否为合约账户
 }
 
 // storage namespace

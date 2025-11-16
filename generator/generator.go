@@ -290,22 +290,12 @@ func (bg *DefaultBlockGenerator) StartBlockGeneration(coreModule core.Core, cons
 
 // calculateMerkleRoot 计算交易的Merkle根
 func (bg *DefaultBlockGenerator) calculateMerkleRoot(transactions []*types.Transaction) types.Hash {
-	// 简化实现：如果交易为空，返回空哈希
+	// 如果交易为空，返回空哈希
 	if len(transactions) == 0 {
 		return types.Hash{}
 	}
 
-	// 如果只有一笔交易，直接返回该交易的哈希
-	if len(transactions) == 1 {
-		data, err := lzbinary.Marshal(transactions[0])
-		if err != nil {
-			return types.Hash{} // 出错时返回空哈希
-		}
-		return bg.crypto.Hash(data)
-	}
-
-	// 多笔交易时计算Merkle根（简化实现）
-	// 实际实现中应该构建完整的Merkle树
+	// 创建交易哈希列表
 	hashes := make([]types.Hash, len(transactions))
 	for i, tx := range transactions {
 		data, err := lzbinary.Marshal(tx)
@@ -315,10 +305,7 @@ func (bg *DefaultBlockGenerator) calculateMerkleRoot(transactions []*types.Trans
 		hashes[i] = bg.crypto.Hash(data)
 	}
 
-	// 简化实现：将所有哈希连接后再次哈希
-	var combined []byte
-	for _, hash := range hashes {
-		combined = append(combined, hash[:]...)
-	}
-	return bg.crypto.Hash(combined)
+	// 构建Merkle树并返回根哈希
+	merkleTree := core.NewMerkleTree(hashes)
+	return merkleTree.GetRootHash()
 }

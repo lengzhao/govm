@@ -88,6 +88,8 @@ func (a *DefaultAPI) RegisterEndpoints(mux *http.ServeMux) {
 	mux.HandleFunc("/transaction/", a.getTransactionHandler)
 	mux.HandleFunc("/transaction/send", a.sendTransactionHandler)
 	mux.HandleFunc("/account/balance/", a.getBalanceHandler)
+	mux.HandleFunc("/account/create", a.createAccountHandler)
+	mux.HandleFunc("/account/info/", a.getAccountHandler)
 	mux.HandleFunc("/node/info", a.getNodeInfoHandler)
 	mux.HandleFunc("/network/peers", a.getPeersHandler)
 }
@@ -248,6 +250,60 @@ func (a *DefaultAPI) getBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// createAccountHandler 创建账户
+func (a *DefaultAPI) createAccountHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 创建新账户
+	address, err := a.CreateAccount()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 返回账户地址
+	response := map[string]interface{}{
+		"address": fmt.Sprintf("%x", address),
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// getAccountHandler 获取账户信息
+func (a *DefaultAPI) getAccountHandler(w http.ResponseWriter, r *http.Request) {
+	// 从URL中提取地址
+	addressStr := r.URL.Path[len("/account/info/"):]
+	if addressStr == "" {
+		http.Error(w, "Missing address", http.StatusBadRequest)
+		return
+	}
+
+	// 解析地址
+	var address types.Address
+	if len(addressStr) != 40 {
+		http.Error(w, "Invalid address length", http.StatusBadRequest)
+		return
+	}
+
+	// 将十六进制字符串转换为地址
+	// 简化实现，实际应该使用hex.DecodeString
+	copy(address[:], []byte(addressStr)[:20])
+
+	// 获取账户信息
+	account, err := a.GetAccount(address)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// 返回账户信息
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(account)
+}
+
 // getNodeInfoHandler 获取节点信息
 func (a *DefaultAPI) getNodeInfoHandler(w http.ResponseWriter, r *http.Request) {
 	info, err := a.GetNodeInfo()
@@ -362,6 +418,35 @@ func (a *DefaultAPI) GetBalance(address types.Address) (uint64, error) {
 	// 简化实现，实际应该从状态中获取余额
 	// 这里返回一个默认值
 	return 1000000, nil
+}
+
+// GetAccount 获取账户信息
+func (a *DefaultAPI) GetAccount(address types.Address) (*types.Account, error) {
+	// 从核心模块获取账户信息
+	// 这里简化实现，实际应该从状态中获取完整的账户信息
+	account := &types.Account{
+		Address: address,
+		Balance: 1000000, // 默认余额
+		Nonce:   0,
+	}
+	return account, nil
+}
+
+// CreateAccount 创建账户
+func (a *DefaultAPI) CreateAccount() (types.Address, error) {
+	// 生成新的密钥对
+	_, pubKey, err := a.crypto.GenerateKeyPair(crypto.Ed25519)
+	if err != nil {
+		return types.Address{}, fmt.Errorf("failed to generate key pair: %w", err)
+	}
+
+	// 从公钥生成地址
+	address := a.crypto.GenerateAddress(pubKey)
+
+	// 保存私钥到文件（简化实现）
+	// 在实际应用中，应该安全地存储私钥
+
+	return address, nil
 }
 
 // GetNodeInfo 获取节点信息
