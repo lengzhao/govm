@@ -170,7 +170,7 @@ func TestBlockValidation(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 签名区块头
-	signature, err := cryptoInstance.Sign(data, privKey)
+	signature, err := cryptoInstance.Sign(data, privKey.Bytes(), crypto.Ed25519)
 	assert.NoError(t, err)
 
 	header2 := &types.BlockHeaderWithSign{

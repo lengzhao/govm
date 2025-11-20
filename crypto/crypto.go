@@ -12,7 +12,6 @@ import (
 	"os"
 
 	"github.com/lengzhao/govm/types"
-	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/scrypt"
 )
 
@@ -22,26 +21,20 @@ type Crypto interface {
 	// If no key type is specified, it generates an Ed25519 key pair by default.
 	GenerateKeyPair(keyType KeyType) (PrivateKey, PublicKey, error)
 
-	// Sign signs data with the given private key.
-	Sign(data []byte, privateKey PrivateKey) ([]byte, error)
+	// Sign signs data with the given private key bytes.
+	Sign(data []byte, privateKey []byte, keyType KeyType) ([]byte, error)
 
-	// Verify verifies a signature with the given public key.
-	Verify(data []byte, signature []byte, publicKey PublicKey) bool
+	// Verify verifies a signature with the given public key bytes.
+	Verify(data []byte, signature []byte, publicKey []byte, keyType KeyType) bool
 
 	// Hash computes the hash of the given data.
 	Hash(data []byte) types.Hash
 
-	// GenerateAddress generates an address from the given public key.
-	GenerateAddress(publicKey PublicKey) types.Address
+	// GenerateAddress generates an address from the given public key bytes.
+	GenerateAddress(publicKey []byte, keyType KeyType) types.Address
 
 	// GenerateRandomBytes generates cryptographically secure random bytes.
 	GenerateRandomBytes(length int) ([]byte, error)
-
-	// HashPassword securely hashes a password using bcrypt.
-	HashPassword(password string) (string, error)
-
-	// VerifyPassword verifies a password against a hash.
-	VerifyPassword(password, hash string) bool
 
 	// EncryptConfig encrypts configuration data.
 	EncryptConfig(data []byte, password string) ([]byte, error)
@@ -138,17 +131,36 @@ func (c *DefaultCrypto) GenerateKeyPair(keyType KeyType) (PrivateKey, PublicKey,
 	}
 }
 
-// Sign signs data with the given private key.
-func (c *DefaultCrypto) Sign(data []byte, privateKey PrivateKey) ([]byte, error) {
-	return privateKey.Sign(data)
+// Sign signs data with the given private key bytes.
+func (c *DefaultCrypto) Sign(data []byte, privateKey []byte, keyType KeyType) ([]byte, error) {
+	// Create a temporary private key object from bytes to use existing implementation
+	priv, _, err := c.GenerateKeyPair(keyType)
+	if err != nil {
+		return nil, err
+	}
+
+	privKey, err := priv.FromBytes(privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return privKey.Sign(data)
 }
 
-// Verify verifies a signature with the given public key.
-func (c *DefaultCrypto) Verify(data []byte, signature []byte, publicKey PublicKey) bool {
-	if publicKey != nil {
-		return publicKey.Verify(data, signature)
+// Verify verifies a signature with the given public key bytes.
+func (c *DefaultCrypto) Verify(data []byte, signature []byte, publicKey []byte, keyType KeyType) bool {
+	// Create a temporary public key object from bytes to use existing implementation
+	_, pub, err := c.GenerateKeyPair(keyType)
+	if err != nil {
+		return false
 	}
-	return false
+
+	pubKey, err := pub.FromBytes(publicKey)
+	if err != nil {
+		return false
+	}
+
+	return pubKey.Verify(data, signature)
 }
 
 // Hash computes the SHA256 hash of the given data.
@@ -157,9 +169,20 @@ func (c *DefaultCrypto) Hash(data []byte) types.Hash {
 	return types.Hash(hash)
 }
 
-// GenerateAddress generates an address from the given public key.
-func (c *DefaultCrypto) GenerateAddress(publicKey PublicKey) types.Address {
-	return publicKey.Address()
+// GenerateAddress generates an address from the given public key bytes.
+func (c *DefaultCrypto) GenerateAddress(publicKey []byte, keyType KeyType) types.Address {
+	// Create a temporary public key object from bytes to use existing implementation
+	_, pub, err := c.GenerateKeyPair(keyType)
+	if err != nil {
+		return types.Address{}
+	}
+
+	pubKey, err := pub.FromBytes(publicKey)
+	if err != nil {
+		return types.Address{}
+	}
+
+	return pubKey.Address()
 }
 
 // deriveKey derives a 32-byte key from a password using scrypt
@@ -315,21 +338,6 @@ func (c *DefaultCrypto) GenerateRandomBytes(length int) ([]byte, error) {
 		return nil, fmt.Errorf("failed to generate random bytes: %w", err)
 	}
 	return bytes, nil
-}
-
-// HashPassword securely hashes a password using bcrypt.
-func (c *DefaultCrypto) HashPassword(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", fmt.Errorf("failed to hash password: %w", err)
-	}
-	return string(hash), nil
-}
-
-// VerifyPassword verifies a password against a hash.
-func (c *DefaultCrypto) VerifyPassword(password, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
 }
 
 // EncryptConfig encrypts configuration data.

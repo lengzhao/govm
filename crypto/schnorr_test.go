@@ -38,7 +38,7 @@ func TestSchnorrSigningAndVerification(t *testing.T) {
 	}
 
 	data := []byte("test message")
-	signature, err := crypto.Sign(data, priv)
+	signature, err := crypto.Sign(data, priv.Bytes(), Schnorr)
 	if err != nil {
 		t.Fatalf("Failed to sign data: %v", err)
 	}
@@ -47,14 +47,14 @@ func TestSchnorrSigningAndVerification(t *testing.T) {
 		t.Error("Signature is nil")
 	}
 
-	valid := crypto.Verify(data, signature, pub)
+	valid := crypto.Verify(data, signature, pub.Bytes(), Schnorr)
 	if !valid {
 		t.Error("Failed to verify signature")
 	}
 
 	// Test with wrong data
 	wrongData := []byte("wrong message")
-	valid = crypto.Verify(wrongData, signature, pub)
+	valid = crypto.Verify(wrongData, signature, pub.Bytes(), Schnorr)
 	if valid {
 		t.Error("Verification should fail with wrong data")
 	}
@@ -68,7 +68,7 @@ func TestSchnorrAddressGeneration(t *testing.T) {
 		t.Fatalf("Failed to generate Schnorr key pair: %v", err)
 	}
 
-	address := crypto.GenerateAddress(pub)
+	address := crypto.GenerateAddress(pub.Bytes(), Schnorr)
 	if address == [20]byte{} {
 		t.Error("Address is empty")
 	}

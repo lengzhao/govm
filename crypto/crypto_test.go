@@ -64,7 +64,7 @@ func TestEd25519SigningAndVerification(t *testing.T) {
 	}
 
 	data := []byte("test message")
-	signature, err := crypto.Sign(data, priv)
+	signature, err := crypto.Sign(data, priv.Bytes(), Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to sign data: %v", err)
 	}
@@ -73,14 +73,14 @@ func TestEd25519SigningAndVerification(t *testing.T) {
 		t.Error("Signature is nil")
 	}
 
-	valid := crypto.Verify(data, signature, pub)
+	valid := crypto.Verify(data, signature, pub.Bytes(), Ed25519)
 	if !valid {
 		t.Error("Failed to verify signature")
 	}
 
 	// Test with wrong data
 	wrongData := []byte("wrong message")
-	valid = crypto.Verify(wrongData, signature, pub)
+	valid = crypto.Verify(wrongData, signature, pub.Bytes(), Ed25519)
 	if valid {
 		t.Error("Verification should fail with wrong data")
 	}
@@ -95,7 +95,7 @@ func TestECDSASigningAndVerification(t *testing.T) {
 	}
 
 	data := []byte("test message")
-	signature, err := crypto.Sign(data, priv)
+	signature, err := crypto.Sign(data, priv.Bytes(), ECDSA)
 	if err != nil {
 		t.Fatalf("Failed to sign data: %v", err)
 	}
@@ -108,21 +108,21 @@ func TestECDSASigningAndVerification(t *testing.T) {
 		t.Errorf("Expected signature length 64, got %d", len(signature))
 	}
 
-	valid := crypto.Verify(data, signature, pub)
+	valid := crypto.Verify(data, signature, pub.Bytes(), ECDSA)
 	if !valid {
 		t.Error("Failed to verify signature")
 	}
 
 	// Test with wrong data
 	wrongData := []byte("wrong message")
-	valid = crypto.Verify(wrongData, signature, pub)
+	valid = crypto.Verify(wrongData, signature, pub.Bytes(), ECDSA)
 	if valid {
 		t.Error("Verification should fail with wrong data")
 	}
 
 	// Test with wrong signature
 	wrongSignature := make([]byte, 64)
-	valid = crypto.Verify(data, wrongSignature, pub)
+	valid = crypto.Verify(data, wrongSignature, pub.Bytes(), ECDSA)
 	if valid {
 		t.Error("Verification should fail with wrong signature")
 	}
@@ -148,7 +148,7 @@ func TestAddressGeneration(t *testing.T) {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
 
-	edAddress := crypto.GenerateAddress(edPub)
+	edAddress := crypto.GenerateAddress(edPub.Bytes(), Ed25519)
 	if edAddress == [20]byte{} {
 		t.Error("Ed25519 address is empty")
 	}
@@ -165,7 +165,7 @@ func TestAddressGeneration(t *testing.T) {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
 
-	ecAddress := crypto.GenerateAddress(ecPub)
+	ecAddress := crypto.GenerateAddress(ecPub.Bytes(), ECDSA)
 	if ecAddress == [20]byte{} {
 		t.Error("ECDSA address is empty")
 	}
@@ -277,12 +277,12 @@ func TestEmptyDataSigning(t *testing.T) {
 	}
 
 	emptyData := []byte{}
-	edSignature, err := crypto.Sign(emptyData, edPriv)
+	edSignature, err := crypto.Sign(emptyData, edPriv.Bytes(), Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to sign empty data with Ed25519: %v", err)
 	}
 
-	if !crypto.Verify(emptyData, edSignature, edPub) {
+	if !crypto.Verify(emptyData, edSignature, edPub.Bytes(), Ed25519) {
 		t.Error("Failed to verify signature for empty data with Ed25519")
 	}
 
@@ -292,12 +292,12 @@ func TestEmptyDataSigning(t *testing.T) {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
 
-	ecSignature, err := crypto.Sign(emptyData, ecPriv)
+	ecSignature, err := crypto.Sign(emptyData, ecPriv.Bytes(), ECDSA)
 	if err != nil {
 		t.Fatalf("Failed to sign empty data with ECDSA: %v", err)
 	}
 
-	if !crypto.Verify(emptyData, ecSignature, ecPub) {
+	if !crypto.Verify(emptyData, ecSignature, ecPub.Bytes(), ECDSA) {
 		t.Error("Failed to verify signature for empty data with ECDSA")
 	}
 }
@@ -317,12 +317,12 @@ func TestLargeDataSigning(t *testing.T) {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
 
-	edSignature, err := crypto.Sign(largeData, edPriv)
+	edSignature, err := crypto.Sign(largeData, edPriv.Bytes(), Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to sign large data with Ed25519: %v", err)
 	}
 
-	if !crypto.Verify(largeData, edSignature, edPub) {
+	if !crypto.Verify(largeData, edSignature, edPub.Bytes(), Ed25519) {
 		t.Error("Failed to verify signature for large data with Ed25519")
 	}
 
@@ -332,12 +332,12 @@ func TestLargeDataSigning(t *testing.T) {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
 
-	ecSignature, err := crypto.Sign(largeData, ecPriv)
+	ecSignature, err := crypto.Sign(largeData, ecPriv.Bytes(), ECDSA)
 	if err != nil {
 		t.Fatalf("Failed to sign large data with ECDSA: %v", err)
 	}
 
-	if !crypto.Verify(largeData, ecSignature, ecPub) {
+	if !crypto.Verify(largeData, ecSignature, ecPub.Bytes(), ECDSA) {
 		t.Error("Failed to verify signature for large data with ECDSA")
 	}
 }
@@ -353,13 +353,13 @@ func TestDeterministicSignatures(t *testing.T) {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
 
-	edSignature1, err := crypto.Sign(data, edPriv)
+	edSignature1, err := crypto.Sign(data, edPriv.Bytes(), Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to sign data with Ed25519: %v", err)
 	}
 
 	// For Ed25519, signatures are deterministic for the same key and data
-	edSignature2, err := crypto.Sign(data, edPriv)
+	edSignature2, err := crypto.Sign(data, edPriv.Bytes(), Ed25519)
 	if err != nil {
 		t.Fatalf("Failed to sign data with Ed25519: %v", err)
 	}
@@ -370,11 +370,11 @@ func TestDeterministicSignatures(t *testing.T) {
 	}
 
 	// Verify both signatures
-	if !crypto.Verify(data, edSignature1, edPub) {
+	if !crypto.Verify(data, edSignature1, edPub.Bytes(), Ed25519) {
 		t.Error("Failed to verify first Ed25519 signature")
 	}
 
-	if !crypto.Verify(data, edSignature2, edPub) {
+	if !crypto.Verify(data, edSignature2, edPub.Bytes(), Ed25519) {
 		t.Error("Failed to verify second Ed25519 signature")
 	}
 }

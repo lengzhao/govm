@@ -38,7 +38,7 @@ func TestSecp256k1SigningAndVerification(t *testing.T) {
 	}
 
 	data := []byte("test message")
-	signature, err := crypto.Sign(data, priv)
+	signature, err := crypto.Sign(data, priv.Bytes(), Secp256k1)
 	if err != nil {
 		t.Fatalf("Failed to sign data: %v", err)
 	}
@@ -47,14 +47,14 @@ func TestSecp256k1SigningAndVerification(t *testing.T) {
 		t.Error("Signature is nil")
 	}
 
-	valid := crypto.Verify(data, signature, pub)
+	valid := crypto.Verify(data, signature, pub.Bytes(), Secp256k1)
 	if !valid {
 		t.Error("Failed to verify signature")
 	}
 
 	// Test with wrong data
 	wrongData := []byte("wrong message")
-	valid = crypto.Verify(wrongData, signature, pub)
+	valid = crypto.Verify(wrongData, signature, pub.Bytes(), Secp256k1)
 	if valid {
 		t.Error("Verification should fail with wrong data")
 	}
@@ -68,7 +68,7 @@ func TestSecp256k1AddressGeneration(t *testing.T) {
 		t.Fatalf("Failed to generate secp256k1 key pair: %v", err)
 	}
 
-	address := crypto.GenerateAddress(pub)
+	address := crypto.GenerateAddress(pub.Bytes(), Secp256k1)
 	if address == [20]byte{} {
 		t.Error("Address is empty")
 	}

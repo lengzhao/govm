@@ -7,7 +7,7 @@ toolchain go1.24.9
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1
-	github.com/lengzhao/binary v0.2.1
+	github.com/lengzhao/binary v0.3.0
 	github.com/lengzhao/network v0.1.1
 	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.0

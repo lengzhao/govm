@@ -83,24 +83,13 @@ func (tp *DefaultTxProcessor) verifyTransactionSignature(tx *types.Transaction, 
 		return fmt.Errorf("failed to marshal transaction: %w", err)
 	}
 
-	// 从交易中获取公钥
+	// 检查公钥是否存在
 	if len(tx.PublicKey) == 0 {
 		return fmt.Errorf("public key is missing in transaction")
 	}
 
-	// 从字节数据创建公钥对象
-	_, pubKey, err := tp.crypto.GenerateKeyPair(crypto.Ed25519)
-	if err != nil {
-		return fmt.Errorf("failed to generate key pair: %w", err)
-	}
-
-	pubKey, err = pubKey.FromBytes(tx.PublicKey)
-	if err != nil {
-		return fmt.Errorf("failed to reconstruct public key from bytes: %w", err)
-	}
-
-	// 验证签名
-	if !tp.crypto.Verify(data, signature, pubKey) {
+	// 验证签名 (修改为使用新的接口)
+	if !tp.crypto.Verify(data, signature, tx.PublicKey, crypto.Ed25519) {
 		return fmt.Errorf("invalid transaction signature")
 	}
 

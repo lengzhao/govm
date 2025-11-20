@@ -151,7 +151,7 @@ func TestBlockSyncWithAPI(t *testing.T) {
 	// 创建测试账户和验证者
 	_, pubKey, err := cryptoImpl.GenerateKeyPair(crypto.Ed25519)
 	assert.NoError(t, err)
-	address := cryptoImpl.GenerateAddress(pubKey)
+	address := cryptoImpl.GenerateAddress(pubKey.Bytes(), crypto.Ed25519)
 	validatorAddr := types.Address{}
 	copy(validatorAddr[:], address[:])
 

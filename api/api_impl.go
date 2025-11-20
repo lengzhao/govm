@@ -432,7 +432,7 @@ func (a *DefaultAPI) GetAccount(address types.Address) (*types.Account, error) {
 	return account, nil
 }
 
-// CreateAccount 创建账户
+// CreateAccount 创建新账户
 func (a *DefaultAPI) CreateAccount() (types.Address, error) {
 	// 生成新的密钥对
 	_, pubKey, err := a.crypto.GenerateKeyPair(crypto.Ed25519)
@@ -441,7 +441,7 @@ func (a *DefaultAPI) CreateAccount() (types.Address, error) {
 	}
 
 	// 从公钥生成地址
-	address := a.crypto.GenerateAddress(pubKey)
+	address := a.crypto.GenerateAddress(pubKey.Bytes(), crypto.Ed25519)
 
 	// 保存私钥到文件（简化实现）
 	// 在实际应用中，应该安全地存储私钥

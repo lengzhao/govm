@@ -195,7 +195,7 @@ func (bg *DefaultBlockGenerator) SignBlock(block *types.Block) error {
 		return fmt.Errorf("failed to generate key pair: %w", err)
 	}
 
-	// 序列化区块头（排除签名字段）用于签名
+	// 重建区块头用于签名（排除签名字段）
 	blockCopy := *block
 	blockCopy.Header.Signature = nil
 
@@ -205,7 +205,7 @@ func (bg *DefaultBlockGenerator) SignBlock(block *types.Block) error {
 	}
 
 	// 对区块头进行签名
-	signature, err := bg.crypto.Sign(data, privKey)
+	signature, err := bg.crypto.Sign(data, privKey.Bytes(), crypto.Ed25519)
 	if err != nil {
 		return fmt.Errorf("failed to sign block: %w", err)
 	}

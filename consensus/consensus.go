@@ -190,7 +190,7 @@ func (p *DefaultPoA) verifyBlockSignature(block *types.Block) error {
 		return fmt.Errorf("failed to marshal block header: %w", err)
 	}
 
-	// 创建公钥对象
+	// 获取验证者的公钥
 	// 注意：这是一个简化的实现，在实际应用中，我们需要从验证者的地址推导出公钥
 	// 或者区块中直接包含公钥信息。这里我们创建一个新的密钥对仅用于演示
 	_, pubKey, err := p.crypto.GenerateKeyPair(crypto.Ed25519)
@@ -198,8 +198,8 @@ func (p *DefaultPoA) verifyBlockSignature(block *types.Block) error {
 		return fmt.Errorf("failed to generate key pair: %w", err)
 	}
 
-	// 验证签名
-	if !p.crypto.Verify(data, block.Header.Signature, pubKey) {
+	// 验证签名 (修改为使用新的接口)
+	if !p.crypto.Verify(data, block.Header.Signature, pubKey.Bytes(), crypto.Ed25519) {
 		return fmt.Errorf("invalid block signature")
 	}
 

@@ -23,7 +23,7 @@ func ExampleSecp256k1() {
 
 	// Sign some data
 	data := []byte("Hello, secp256k1!")
-	signature, err := crypto.Sign(data, privKey)
+	signature, err := crypto.Sign(data, privKey.Bytes(), Secp256k1)
 	if err != nil {
 		fmt.Printf("Error signing data: %v\n", err)
 		return
@@ -32,16 +32,16 @@ func ExampleSecp256k1() {
 	fmt.Printf("Data signed successfully, signature length: %d bytes\n", len(signature))
 
 	// Verify the signature
-	valid := crypto.Verify(data, signature, pubKey)
+	valid := crypto.Verify(data, signature, pubKey.Bytes(), Secp256k1)
 	fmt.Printf("Signature verification result: %t\n", valid)
 
 	// Try to verify with wrong data
 	wrongData := []byte("Wrong data")
-	valid = crypto.Verify(wrongData, signature, pubKey)
+	valid = crypto.Verify(wrongData, signature, pubKey.Bytes(), Secp256k1)
 	fmt.Printf("Signature verification with wrong data: %t\n", valid)
 
 	// Generate an address from the public key
-	address := crypto.GenerateAddress(pubKey)
+	address := crypto.GenerateAddress(pubKey.Bytes(), Secp256k1)
 	fmt.Printf("Generated address: %x\n", address)
 
 	// Demonstrate key serialization and deserialization
@@ -68,13 +68,13 @@ func ExampleSecp256k1() {
 	fmt.Printf("Reconstructed public key type: %s\n", reconstructedPub.Type())
 
 	// Verify that reconstructed keys work
-	reconstructedSignature, err := crypto.Sign(data, reconstructedPriv)
+	reconstructedSignature, err := crypto.Sign(data, reconstructedPriv.Bytes(), Secp256k1)
 	if err != nil {
 		fmt.Printf("Error signing with reconstructed private key: %v\n", err)
 		return
 	}
 
-	valid = crypto.Verify(data, reconstructedSignature, reconstructedPub)
+	valid = crypto.Verify(data, reconstructedSignature, reconstructedPub.Bytes(), Secp256k1)
 	fmt.Printf("Signature verification with reconstructed keys: %t\n", valid)
 }
 
@@ -96,7 +96,7 @@ func ExampleSchnorr() {
 
 	// Sign some data
 	data := []byte("Hello, Schnorr!")
-	signature, err := crypto.Sign(data, privKey)
+	signature, err := crypto.Sign(data, privKey.Bytes(), Schnorr)
 	if err != nil {
 		fmt.Printf("Error signing data: %v\n", err)
 		return
@@ -105,16 +105,16 @@ func ExampleSchnorr() {
 	fmt.Printf("Data signed successfully, signature length: %d bytes\n", len(signature))
 
 	// Verify the signature
-	valid := crypto.Verify(data, signature, pubKey)
+	valid := crypto.Verify(data, signature, pubKey.Bytes(), Schnorr)
 	fmt.Printf("Signature verification result: %t\n", valid)
 
 	// Try to verify with wrong data
 	wrongData := []byte("Wrong data")
-	valid = crypto.Verify(wrongData, signature, pubKey)
+	valid = crypto.Verify(wrongData, signature, pubKey.Bytes(), Schnorr)
 	fmt.Printf("Signature verification with wrong data: %t\n", valid)
 
 	// Generate an address from the public key
-	address := crypto.GenerateAddress(pubKey)
+	address := crypto.GenerateAddress(pubKey.Bytes(), Schnorr)
 	fmt.Printf("Generated address: %x\n", address)
 
 	// Demonstrate key serialization and deserialization
@@ -141,12 +141,12 @@ func ExampleSchnorr() {
 	fmt.Printf("Reconstructed public key type: %s\n", reconstructedPub.Type())
 
 	// Verify that reconstructed keys work
-	reconstructedSignature, err := crypto.Sign(data, reconstructedPriv)
+	reconstructedSignature, err := crypto.Sign(data, reconstructedPriv.Bytes(), Schnorr)
 	if err != nil {
 		fmt.Printf("Error signing with reconstructed private key: %v\n", err)
 		return
 	}
 
-	valid = crypto.Verify(data, reconstructedSignature, reconstructedPub)
+	valid = crypto.Verify(data, reconstructedSignature, reconstructedPub.Bytes(), Schnorr)
 	fmt.Printf("Signature verification with reconstructed keys: %t\n", valid)
 }
