@@ -12,14 +12,11 @@ This package provides cryptographic functions for the govm blockchain, including
 ## Key Generation
 
 ```go
-// Create a new crypto instance
-crypto := NewCrypto()
-
 // Generate different types of key pairs using the unified method
-ed25519Priv, ed25519Pub, _ := crypto.GenerateKeyPair(Ed25519)
-ecdsaPriv, ecdsaPub, _ := crypto.GenerateKeyPair(ECDSA)
-secp256k1Priv, secp256k1Pub, _ := crypto.GenerateKeyPair(Secp256k1)
-schnorrPriv, schnorrPub, _ := crypto.GenerateKeyPair(Schnorr)
+ed25519Priv, ed25519Pub, _ := crypto.GenerateKeyPair(crypto.Ed25519)
+ecdsaPriv, ecdsaPub, _ := crypto.GenerateKeyPair(crypto.ECDSA)
+secp256k1Priv, secp256k1Pub, _ := crypto.GenerateKeyPair(crypto.Secp256k1)
+schnorrPriv, schnorrPub, _ := crypto.GenerateKeyPair(crypto.Schnorr)
 ```
 
 ## Signing and Verification
@@ -27,39 +24,44 @@ schnorrPriv, schnorrPub, _ := crypto.GenerateKeyPair(Schnorr)
 ```go
 // Sign data
 data := []byte("Hello, World!")
-signature, _ := crypto.Sign(data, privateKey)
+signature, _ := crypto.Sign(data, privateKey, keyType)
 
 // Verify signature
-valid := crypto.Verify(data, signature, publicKey)
+valid := crypto.Verify(data, signature, publicKey, keyType)
 ```
 
 ## Address Generation
 
 ```go
 // Generate address from public key
-address := crypto.GenerateAddress(publicKey)
+address := crypto.GenerateAddress(publicKey, keyType)
 ```
 
 ## Key Serialization
 
+Keys can be serialized and deserialized through the Algorithm interface:
+
 ```go
+// Get algorithm instance
+algorithm, _ := crypto.AlgorithmFactory(keyType)
+
 // Serialize keys to bytes
 privBytes := privateKey.Bytes()
 pubBytes := publicKey.Bytes()
 
 // Deserialize keys from bytes
-reconstructedPriv, _ := privateKey.FromBytes(privBytes)
-reconstructedPub, _ := publicKey.FromBytes(pubBytes)
+reconstructedPriv, _ := algorithm.PrivateKeyFromBytes(privBytes)
+reconstructedPub, _ := algorithm.PublicKeyFromBytes(pubBytes)
 ```
 
 ## Key Storage
 
 ```go
 // Save private key to encrypted file
-err := SaveToFile(privateKey, "key.json", "password")
+err := crypto.SaveToFile(privateKey, "key.json", "password")
 
 // Load private key from encrypted file
-loadedPriv, err := LoadFromFile("key.json", "password")
+loadedPriv, err := crypto.LoadFromFile("key.json", "password")
 ```
 
 ## Secp256k1 and Schnorr Support
@@ -90,8 +92,7 @@ The crypto package is organized into separate files for each signature scheme:
 
 ## Usage Examples
 
-See `example_secp256k1.go` for detailed examples of how to use secp256k1 and Schnorr signatures.
-See `example_unified.go` for examples of how to use the unified GenerateKeyPair method.
+See the examples directory for detailed usage examples.
 
 ## Installation
 
@@ -112,85 +113,38 @@ import (
 )
 
 func main() {
-    // Create a new crypto instance
-    c := crypto.NewCrypto()
-    
     // Generate a key pair
-    priv, pub, err := c.GenerateKeyPair()
+    priv, pub, err := crypto.GenerateKeyPair(crypto.Ed25519)
     if err != nil {
         panic(err)
     }
     
     // Sign data
     data := []byte("Hello, World!")
-    signature, err := c.Sign(data, priv)
+    signature, err := crypto.Sign(data, priv, crypto.Ed25519)
     if err != nil {
         panic(err)
     }
     
     // Verify signature
-    valid := c.Verify(data, signature, pub)
+    valid := crypto.Verify(data, signature, pub, crypto.Ed25519)
     fmt.Printf("Signature valid: %v\n", valid)
     
     // Generate address
-    address := c.GenerateAddress(pub)
+    address := crypto.GenerateAddress(pub, crypto.Ed25519)
     fmt.Printf("Address: %x\n", address)
     
     // Hash data
-    hash := c.Hash(data)
+    hash := crypto.Hash(data)
     fmt.Printf("SHA256 Hash: %x\n", hash)
-    
-    // Hash hash
-    keccakHash := c.Hash(data)
-    fmt.Printf("Hash Hash: %x\n", keccakHash)
 }
-```
-
-### Ed25519 Specific Usage
-
-```go
-// Generate Ed25519 key pair
-priv, pub, err := c.GenerateEd25519KeyPair()
-if err != nil {
-    panic(err)
-}
-
-// Sign and verify
-data := []byte("Hello, Ed25519!")
-signature, err := c.Sign(data, priv)
-if err != nil {
-    panic(err)
-}
-
-valid := c.Verify(data, signature, pub)
-fmt.Printf("Ed25519 signature valid: %v\n", valid)
-```
-
-### ECDSA Specific Usage
-
-```go
-// Generate ECDSA key pair
-priv, pub, err := c.GenerateECDSAKeyPair()
-if err != nil {
-    panic(err)
-}
-
-// Sign and verify
-data := []byte("Hello, ECDSA!")
-signature, err := c.Sign(data, priv)
-if err != nil {
-    panic(err)
-}
-
-valid := c.Verify(data, signature, pub)
-fmt.Printf("ECDSA signature valid: %v\n", valid)
 ```
 
 ### Key Encryption with Password Protection
 
 ```go
 // Generate a key pair
-priv, _, err := c.GenerateKeyPair()
+priv, _, err := crypto.GenerateKeyPair(crypto.Ed25519)
 if err != nil {
     panic(err)
 }
@@ -235,20 +189,35 @@ The crypto module is organized into several files:
 - `crypto.go`: Main interface definitions and core logic
 - `ed25519.go`: Ed25519 algorithm implementation
 - `ecdsa.go`: ECDSA algorithm implementation
+- `secp256k1.go`: Secp256k1 algorithm implementation
+- `schnorr.go`: Schnorr algorithm implementation
 - `crypto_test.go`: Unit tests for all functionality
 
 ## API Reference
 
-### Crypto Interface
+All cryptographic operations are accessed through the unified functions in `crypto.go`. Direct algorithm-specific functions have been removed to simplify the API and reduce module usage complexity.
+
+### Unified Functions
 
 ```go
-type Crypto interface {
-    GenerateKeyPair(keyType KeyType) (PrivateKey, PublicKey, error)
-    Sign(data []byte, privateKey PrivateKey) ([]byte, error)
-    Verify(data []byte, signature []byte, publicKey PublicKey) bool
-    Hash(data []byte) types.Hash
-    Hash(data []byte) types.Hash
-    GenerateAddress(publicKey PublicKey) types.Address
+func GenerateKeyPair(keyType string) ([]byte, []byte, error)
+func Sign(data []byte, privateKey []byte, keyType string) ([]byte, error)
+func Verify(data []byte, signature []byte, publicKey []byte, keyType string) bool
+func GenerateAddress(publicKey []byte, keyType string) types.Address
+func Hash(data []byte) types.Hash
+```
+
+### Algorithm Interface
+
+```go
+type Algorithm interface {
+    GenerateKeyPair() (privateKey []byte, publicKey []byte, error error)
+    Sign(data []byte, privateKey []byte) ([]byte, error)
+    Verify(data []byte, signature []byte, publicKey []byte) bool
+    GenerateAddress(publicKey []byte) types.Address
+    Type() string
+    PrivateKeyFromBytes(data []byte) (PrivateKey, error)
+    PublicKeyFromBytes(data []byte) (PublicKey, error)
 }
 ```
 
@@ -259,8 +228,7 @@ type PrivateKey interface {
     Bytes() []byte
     PublicKey() PublicKey
     Sign(data []byte) ([]byte, error)
-    Type() KeyType
-    FromBytes(data []byte) (PrivateKey, error)
+    Type() string
 }
 ```
 
@@ -271,8 +239,7 @@ type PublicKey interface {
     Bytes() []byte
     Address() types.Address
     Verify(data []byte, signature []byte) bool
-    Type() KeyType
-    FromBytes(data []byte) (PublicKey, error)
+    Type() string
 }
 ```
 
@@ -285,6 +252,20 @@ func SaveToFile(privateKey PrivateKey, filename string, password string) error
 // Load private key from file (using provided password, or default password if empty)
 func LoadFromFile(filename string, password string) (PrivateKey, error)
 ```
+
+## Algorithm Registration
+
+The crypto package uses a factory pattern for algorithm registration. Each algorithm is registered at initialization time and can be accessed through the factory:
+
+```go
+// Register an algorithm (typically done in the init() function of each algorithm file)
+RegisterAlgorithm(algorithm Algorithm) error
+
+// Get an algorithm instance
+algorithm, err := AlgorithmFactory(keyType string) (Algorithm, error)
+```
+
+For stateless algorithms (which is the case for all current implementations), the same instance is reused across all operations, which reduces memory allocation and improves performance. The algorithm type is determined by calling the `Type()` method on the algorithm instance, so there's no need to pass the key type separately during registration.
 
 ## Security Considerations
 

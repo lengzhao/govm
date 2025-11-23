@@ -9,10 +9,17 @@ import (
 	"github.com/lengzhao/govm/types"
 )
 
+func init() {
+	RegisterAlgorithm(&secp256k1Algorithm{})
+}
+
 // secp256k1PrivateKey implements the PrivateKey interface for secp256k1 keys.
 type secp256k1PrivateKey struct {
 	key *btcec.PrivateKey
 }
+
+// secp256k1Algorithm implements the Algorithm interface for secp256k1.
+type secp256k1Algorithm struct{}
 
 // Bytes returns the secp256k1 private key as bytes.
 func (k *secp256k1PrivateKey) Bytes() []byte {
@@ -40,7 +47,7 @@ func (k *secp256k1PrivateKey) Sign(data []byte) ([]byte, error) {
 }
 
 // Type returns the key type.
-func (k *secp256k1PrivateKey) Type() KeyType {
+func (k *secp256k1PrivateKey) Type() string {
 	return Secp256k1
 }
 
@@ -90,18 +97,84 @@ func (k *secp256k1PublicKey) Verify(data []byte, signature []byte) bool {
 }
 
 // Type returns the key type.
-func (k *secp256k1PublicKey) Type() KeyType {
+func (k *secp256k1PublicKey) Type() string {
 	return Secp256k1
 }
 
-// GenerateSecp256k1KeyPair generates a new secp256k1 key pair.
-func GenerateSecp256k1KeyPair() (PrivateKey, PublicKey, error) {
+// GenerateKeyPair 生成新的密钥对
+func (a *secp256k1Algorithm) GenerateKeyPair() ([]byte, []byte, error) {
 	privKey, err := btcec.NewPrivateKey()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	priv := &secp256k1PrivateKey{key: privKey}
-	pub := &secp256k1PublicKey{key: privKey.PubKey()}
-	return priv, pub, nil
+	return privKey.Serialize(), privKey.PubKey().SerializeCompressed(), nil
+}
+
+// Sign 使用私钥对数据进行签名
+func (a *secp256k1Algorithm) Sign(data []byte, privateKey []byte) ([]byte, error) {
+	privKey, _ := btcec.PrivKeyFromBytes(privateKey)
+	hash := sha256.Sum256(data)
+	signature := ecdsa.Sign(privKey, hash[:])
+
+	// Serialize the signature
+	return signature.Serialize(), nil
+}
+
+// Verify 使用公钥验证签名
+func (a *secp256k1Algorithm) Verify(data []byte, signature []byte, publicKey []byte) bool {
+	// Parse the compressed public key
+	pubKey, err := btcec.ParsePubKey(publicKey)
+	if err != nil {
+		return false
+	}
+
+	hash := sha256.Sum256(data)
+
+	// Parse the signature
+	sig, err := ecdsa.ParseSignature(signature)
+	if err != nil {
+		return false
+	}
+
+	return sig.Verify(hash[:], pubKey)
+}
+
+// GenerateAddress 从公钥生成地址
+func (a *secp256k1Algorithm) GenerateAddress(publicKey []byte) types.Address {
+	// Parse the compressed public key
+	pubKey, err := btcec.ParsePubKey(publicKey)
+	if err != nil {
+		// Return empty address if parsing fails
+		return types.Address{}
+	}
+
+	// Hash the public key and take the last 20 bytes as the address
+	pubKeyBytes := pubKey.SerializeCompressed()
+	hash := sha256.Sum256(pubKeyBytes)
+	var addr types.Address
+	copy(addr[:], hash[len(hash)-20:])
+	return addr
+}
+
+// Type 返回算法类型
+func (a *secp256k1Algorithm) Type() string {
+	return Secp256k1
+}
+
+// PrivateKeyFromBytes 从字节数据创建私钥
+func (a *secp256k1Algorithm) PrivateKeyFromBytes(data []byte) (PrivateKey, error) {
+	privKey, _ := btcec.PrivKeyFromBytes(data)
+	return &secp256k1PrivateKey{key: privKey}, nil
+}
+
+// PublicKeyFromBytes 从字节数据创建公钥
+func (a *secp256k1Algorithm) PublicKeyFromBytes(data []byte) (PublicKey, error) {
+	// Parse the compressed public key
+	pubKey, err := btcec.ParsePubKey(data)
+	if err != nil {
+		return nil, fmt.Errorf("invalid public key data: %w", err)
+	}
+
+	return &secp256k1PublicKey{key: pubKey}, nil
 }

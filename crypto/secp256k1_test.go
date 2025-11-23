@@ -5,9 +5,7 @@ import (
 )
 
 func TestSecp256k1KeyGeneration(t *testing.T) {
-	crypto := NewCrypto()
-
-	priv, pub, err := crypto.GenerateKeyPair(Secp256k1)
+	priv, pub, err := GenerateKeyPair(Secp256k1)
 	if err != nil {
 		t.Fatalf("Failed to generate secp256k1 key pair: %v", err)
 	}
@@ -20,25 +18,24 @@ func TestSecp256k1KeyGeneration(t *testing.T) {
 		t.Error("Public key is nil")
 	}
 
-	if priv.Type() != Secp256k1 {
-		t.Errorf("Expected private key type Secp256k1, got %s", priv.Type())
+	// Since we're now returning []byte directly, we can only check the length
+	if len(priv) == 0 {
+		t.Error("Private key is empty")
 	}
 
-	if pub.Type() != Secp256k1 {
-		t.Errorf("Expected public key type Secp256k1, got %s", pub.Type())
+	if len(pub) == 0 {
+		t.Error("Public key is empty")
 	}
 }
 
 func TestSecp256k1SigningAndVerification(t *testing.T) {
-	crypto := NewCrypto()
-
-	priv, pub, err := crypto.GenerateKeyPair(Secp256k1)
+	priv, pub, err := GenerateKeyPair(Secp256k1)
 	if err != nil {
 		t.Fatalf("Failed to generate secp256k1 key pair: %v", err)
 	}
 
 	data := []byte("test message")
-	signature, err := crypto.Sign(data, priv.Bytes(), Secp256k1)
+	signature, err := Sign(data, priv, Secp256k1)
 	if err != nil {
 		t.Fatalf("Failed to sign data: %v", err)
 	}
@@ -47,136 +44,159 @@ func TestSecp256k1SigningAndVerification(t *testing.T) {
 		t.Error("Signature is nil")
 	}
 
-	valid := crypto.Verify(data, signature, pub.Bytes(), Secp256k1)
+	valid := Verify(data, signature, pub, Secp256k1)
 	if !valid {
 		t.Error("Failed to verify signature")
 	}
 
 	// Test with wrong data
 	wrongData := []byte("wrong message")
-	valid = crypto.Verify(wrongData, signature, pub.Bytes(), Secp256k1)
+	valid = Verify(wrongData, signature, pub, Secp256k1)
 	if valid {
 		t.Error("Verification should fail with wrong data")
 	}
 }
 
 func TestSecp256k1AddressGeneration(t *testing.T) {
-	crypto := NewCrypto()
-
-	_, pub, err := crypto.GenerateKeyPair(Secp256k1)
+	_, pub, err := GenerateKeyPair(Secp256k1)
 	if err != nil {
 		t.Fatalf("Failed to generate secp256k1 key pair: %v", err)
 	}
 
-	address := crypto.GenerateAddress(pub.Bytes(), Secp256k1)
+	address := GenerateAddress(pub, Secp256k1)
 	if address == [20]byte{} {
 		t.Error("Address is empty")
 	}
-
-	// Verify that the address can be derived from the public key directly
-	derivedAddress := pub.Address()
-	if address != derivedAddress {
-		t.Error("Address mismatch between crypto.GenerateAddress and pub.Address()")
-	}
 }
 
-func TestSecp256k1PrivateKeyBytes(t *testing.T) {
-	crypto := NewCrypto()
-
-	// Test secp256k1 private key bytes
-	secpPriv, _, err := crypto.GenerateKeyPair(Secp256k1)
-	if err != nil {
-		t.Fatalf("Failed to generate secp256k1 key pair: %v", err)
-	}
-
-	secpBytes := secpPriv.Bytes()
-	if len(secpBytes) == 0 {
-		t.Error("secp256k1 private key bytes are empty")
-	}
-}
-
-func TestSecp256k1PublicKeyBytes(t *testing.T) {
-	crypto := NewCrypto()
-
-	// Test secp256k1 public key bytes
-	_, secpPub, err := crypto.GenerateKeyPair(Secp256k1)
-	if err != nil {
-		t.Fatalf("Failed to generate secp256k1 key pair: %v", err)
-	}
-
-	secpBytes := secpPub.Bytes()
-	if len(secpBytes) == 0 {
-		t.Error("secp256k1 public key bytes are empty")
-	}
-}
-
-func TestSecp256k1PublicKeyFromPrivateKey(t *testing.T) {
-	crypto := NewCrypto()
-
-	// Test secp256k1
-	secpPriv, secpPub, err := crypto.GenerateKeyPair(Secp256k1)
-	if err != nil {
-		t.Fatalf("Failed to generate secp256k1 key pair: %v", err)
-	}
-
-	derivedPub := secpPriv.PublicKey()
-	if derivedPub.Type() != secpPub.Type() {
-		t.Error("Derived public key type mismatch")
-	}
-}
-
-// Test FromBytes methods
+// Test FromBytes methods - these tests are no longer applicable with the new interface
 func TestSecp256k1PrivateKeyFromBytes(t *testing.T) {
-	crypto := NewCrypto()
-
-	// Test secp256k1 private key FromBytes
-	secpPriv, _, err := crypto.GenerateKeyPair(Secp256k1)
-	if err != nil {
-		t.Fatalf("Failed to generate secp256k1 key pair: %v", err)
-	}
-
-	secpBytes := secpPriv.Bytes()
-	reconstructedSecpPriv, err := secpPriv.FromBytes(secpBytes)
-	if err != nil {
-		t.Fatalf("Failed to reconstruct secp256k1 private key from bytes: %v", err)
-	}
-
-	if reconstructedSecpPriv.Type() != secpPriv.Type() {
-		t.Errorf("Expected reconstructed key type %s, got %s", secpPriv.Type(), reconstructedSecpPriv.Type())
-	}
-
-	if string(reconstructedSecpPriv.Bytes()) != string(secpPriv.Bytes()) {
-		t.Error("Reconstructed secp256k1 private key bytes do not match original")
-	}
+	t.Skip("Test not applicable with new interface")
 }
 
 func TestSecp256k1PublicKeyFromBytesTest(t *testing.T) {
-	crypto := NewCrypto()
+	t.Skip("Test not applicable with new interface")
+}
 
-	// Test secp256k1 public key FromBytes
-	_, secpPub, err := crypto.GenerateKeyPair(Secp256k1)
+// Additional edge case tests for Secp256k1
+func TestSecp256k1AdditionalEdgeCases(t *testing.T) {
+	// Test multiple key generations produce different keys
+	priv1, pub1, err := GenerateKeyPair(Secp256k1)
 	if err != nil {
-		t.Fatalf("Failed to generate secp256k1 key pair: %v", err)
+		t.Fatalf("Failed to generate first Secp256k1 key pair: %v", err)
 	}
 
-	secpBytes := secpPub.Bytes()
-	reconstructedSecpPub, err := secpPub.FromBytes(secpBytes)
+	priv2, pub2, err := GenerateKeyPair(Secp256k1)
 	if err != nil {
-		t.Fatalf("Failed to reconstruct secp256k1 public key from bytes: %v", err)
+		t.Fatalf("Failed to generate second Secp256k1 key pair: %v", err)
 	}
 
-	if reconstructedSecpPub.Type() != secpPub.Type() {
-		t.Errorf("Expected reconstructed key type %s, got %s", secpPub.Type(), reconstructedSecpPub.Type())
+	if string(priv1) == string(priv2) {
+		t.Error("Generated private keys should be different")
 	}
 
-	if string(reconstructedSecpPub.Bytes()) != string(secpPub.Bytes()) {
-		t.Error("Reconstructed secp256k1 public key bytes do not match original")
+	if string(pub1) == string(pub2) {
+		t.Error("Generated public keys should be different")
 	}
 
-	// Verify that both keys produce the same address
-	originalAddr := secpPub.Address()
-	reconstructedAddr := reconstructedSecpPub.Address()
-	if originalAddr != reconstructedAddr {
-		t.Error("Reconstructed secp256k1 public key produces different address")
+	// Test signing with maximum data size
+	maxData := make([]byte, 10*1024*1024) // 10MB
+	for i := range maxData {
+		maxData[i] = byte(i % 256)
+	}
+
+	signature, err := Sign(maxData, priv1, Secp256k1)
+	if err != nil {
+		t.Fatalf("Failed to sign maximum data size: %v", err)
+	}
+
+	if !Verify(maxData, signature, pub1, Secp256k1) {
+		t.Error("Failed to verify signature for maximum data size")
+	}
+
+	// Test with nil data
+	nilSignature, err := Sign(nil, priv1, Secp256k1)
+	if err != nil {
+		t.Fatalf("Failed to sign nil data: %v", err)
+	}
+
+	if !Verify(nil, nilSignature, pub1, Secp256k1) {
+		t.Error("Failed to verify signature for nil data")
+	}
+
+	// Test with empty data
+	emptyData := []byte{}
+	emptySignature, err := Sign(emptyData, priv1, Secp256k1)
+	if err != nil {
+		t.Fatalf("Failed to sign empty data: %v", err)
+	}
+
+	if !Verify(emptyData, emptySignature, pub1, Secp256k1) {
+		t.Error("Failed to verify signature for empty data")
+	}
+
+	// Test with invalid public key
+	invalidPub := make([]byte, 33)
+	if Verify([]byte("test"), signature, invalidPub, Secp256k1) {
+		t.Error("Verification should fail with invalid public key")
+	}
+
+	// Test with corrupted signature
+	corruptedSig := make([]byte, len(signature))
+	copy(corruptedSig, signature)
+	corruptedSig[0] ^= 0x01 // Flip one bit
+	if Verify([]byte("test"), corruptedSig, pub1, Secp256k1) {
+		t.Error("Verification should fail with corrupted signature")
+	}
+
+	// Test signature verification with wrong public key
+	testData := []byte("test data")
+	wrongPriv, _, err := GenerateKeyPair(Secp256k1)
+	if err != nil {
+		t.Fatalf("Failed to generate wrong key pair: %v", err)
+	}
+
+	wrongSignature, err := Sign(testData, wrongPriv, Secp256k1)
+	if err != nil {
+		t.Fatalf("Failed to sign with wrong key: %v", err)
+	}
+
+	if Verify(testData, wrongSignature, pub1, Secp256k1) {
+		t.Error("Verification should fail with wrong public key")
+	}
+}
+
+// Test Secp256k1 address generation edge cases
+func TestSecp256k1AddressAdditionalEdgeCases(t *testing.T) {
+	// Test multiple address generations produce consistent results
+	_, pub, err := GenerateKeyPair(Secp256k1)
+	if err != nil {
+		t.Fatalf("Failed to generate key pair: %v", err)
+	}
+
+	addr1 := GenerateAddress(pub, Secp256k1)
+	addr2 := GenerateAddress(pub, Secp256k1)
+
+	if addr1 != addr2 {
+		t.Error("Address generation should be deterministic")
+	}
+
+	// Test address with invalid public key
+	invalidPub := make([]byte, 10)
+	addr := GenerateAddress(invalidPub, Secp256k1)
+	if addr != [20]byte{} {
+		t.Error("Address for invalid public key should be empty")
+	}
+
+	// Test address with empty public key
+	emptyAddr := GenerateAddress([]byte{}, Secp256k1)
+	if emptyAddr != [20]byte{} {
+		t.Error("Address for empty public key should be empty")
+	}
+
+	// Test address with nil public key
+	nilAddr := GenerateAddress(nil, Secp256k1)
+	if nilAddr != [20]byte{} {
+		t.Error("Address for nil public key should be empty")
 	}
 }

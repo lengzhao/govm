@@ -11,10 +11,17 @@ import (
 	"github.com/lengzhao/govm/types"
 )
 
+func init() {
+	RegisterAlgorithm(&ecdsaAlgorithm{})
+}
+
 // ecdsaPrivateKey implements the PrivateKey interface for ECDSA keys.
 type ecdsaPrivateKey struct {
 	key *ecdsa.PrivateKey
 }
+
+// ecdsaAlgorithm implements the Algorithm interface for ECDSA.
+type ecdsaAlgorithm struct{}
 
 // Bytes returns the ECDSA private key as bytes.
 func (k *ecdsaPrivateKey) Bytes() []byte {
@@ -66,7 +73,7 @@ func (k *ecdsaPrivateKey) signHash(hash []byte) ([]byte, error) {
 }
 
 // Type returns the key type.
-func (k *ecdsaPrivateKey) Type() KeyType {
+func (k *ecdsaPrivateKey) Type() string {
 	return ECDSA
 }
 
@@ -121,28 +128,116 @@ func (k *ecdsaPublicKey) Verify(data []byte, signature []byte) bool {
 }
 
 // Type returns the key type.
-func (k *ecdsaPublicKey) Type() KeyType {
+func (k *ecdsaPublicKey) Type() string {
 	return ECDSA
 }
 
-// GenerateECDSAKeyPair generates a new ECDSA key pair using the secp256k1 curve.
-func GenerateECDSAKeyPair() (PrivateKey, PublicKey, error) {
+// GenerateKeyPair 生成新的密钥对
+func (a *ecdsaAlgorithm) GenerateKeyPair() ([]byte, []byte, error) {
 	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	priv := &ecdsaPrivateKey{key: privKey}
-	pub := &ecdsaPublicKey{key: &privKey.PublicKey}
-	return priv, pub, nil
+	// 返回私钥的D值和压缩的公钥
+	privKeyBytes := privKey.D.Bytes()
+	pubKeyBytes := elliptic.MarshalCompressed(privKey.PublicKey.Curve, privKey.PublicKey.X, privKey.PublicKey.Y)
+
+	return privKeyBytes, pubKeyBytes, nil
 }
 
-// ECDSAPrivateKeyFromBytes creates an ECDSA private key from bytes.
-func ECDSAPrivateKeyFromBytes(data []byte) (PrivateKey, error) {
+// Sign 使用私钥对数据进行签名
+func (a *ecdsaAlgorithm) Sign(data []byte, privateKey []byte) ([]byte, error) {
+	// Create a new private key from the D value
+	d := new(big.Int).SetBytes(privateKey)
+
+	// Create the private key with the P256 curve
+	privKey := &ecdsa.PrivateKey{
+		PublicKey: ecdsa.PublicKey{
+			Curve: elliptic.P256(),
+		},
+		D: d,
+	}
+
+	// Calculate the public key coordinates
+	privKey.PublicKey.X, privKey.PublicKey.Y = privKey.PublicKey.Curve.ScalarBaseMult(privateKey)
+
+	hash := sha256.Sum256(data)
+	return a.signHash(hash[:], privKey)
+}
+
+// signHash signs a hash with the ECDSA private key.
+func (a *ecdsaAlgorithm) signHash(hash []byte, privKey *ecdsa.PrivateKey) ([]byte, error) {
+	r, s, err := ecdsa.Sign(rand.Reader, privKey, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	// Serialize the signature (R || S)
+	signature := make([]byte, 64)
+	r.FillBytes(signature[:32])
+	s.FillBytes(signature[32:])
+	return signature, nil
+}
+
+// Verify 使用公钥验证签名
+func (a *ecdsaAlgorithm) Verify(data []byte, signature []byte, publicKey []byte) bool {
+	if len(signature) != 64 {
+		return false
+	}
+
+	// Parse the compressed public key
+	x, y := elliptic.UnmarshalCompressed(elliptic.P256(), publicKey)
+	if x == nil || y == nil {
+		return false
+	}
+
+	pubKey := &ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     x,
+		Y:     y,
+	}
+
+	hash := sha256.Sum256(data)
+	r := new(big.Int).SetBytes(signature[:32])
+	s := new(big.Int).SetBytes(signature[32:])
+	return ecdsa.Verify(pubKey, hash[:], r, s)
+}
+
+// GenerateAddress 从公钥生成地址
+func (a *ecdsaAlgorithm) GenerateAddress(publicKey []byte) types.Address {
+	// Parse the compressed public key
+	x, y := elliptic.UnmarshalCompressed(elliptic.P256(), publicKey)
+	if x == nil || y == nil {
+		// Return empty address if parsing fails
+		return types.Address{}
+	}
+
+	pubKey := &ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     x,
+		Y:     y,
+	}
+
+	// Hash the public key and take the last 20 bytes as the address
+	pubKeyBytes := elliptic.MarshalCompressed(pubKey.Curve, pubKey.X, pubKey.Y)
+	hash := sha256.Sum256(pubKeyBytes)
+	var addr types.Address
+	copy(addr[:], hash[len(hash)-20:])
+	return addr
+}
+
+// Type 返回算法类型
+func (a *ecdsaAlgorithm) Type() string {
+	return ECDSA
+}
+
+// PrivateKeyFromBytes 从字节数据创建私钥
+func (a *ecdsaAlgorithm) PrivateKeyFromBytes(data []byte) (PrivateKey, error) {
 	// Create a new private key from the D value
 	d := new(big.Int).SetBytes(data)
 
-	// Create the private key with the secp256k1 curve
+	// Create the private key with the P256 curve
 	privKey := &ecdsa.PrivateKey{
 		PublicKey: ecdsa.PublicKey{
 			Curve: elliptic.P256(),
@@ -154,4 +249,21 @@ func ECDSAPrivateKeyFromBytes(data []byte) (PrivateKey, error) {
 	privKey.PublicKey.X, privKey.PublicKey.Y = privKey.PublicKey.Curve.ScalarBaseMult(data)
 
 	return &ecdsaPrivateKey{key: privKey}, nil
+}
+
+// PublicKeyFromBytes 从字节数据创建公钥
+func (a *ecdsaAlgorithm) PublicKeyFromBytes(data []byte) (PublicKey, error) {
+	// Parse the compressed public key
+	x, y := elliptic.UnmarshalCompressed(elliptic.P256(), data)
+	if x == nil || y == nil {
+		return nil, fmt.Errorf("invalid public key data")
+	}
+
+	pubKey := &ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     x,
+		Y:     y,
+	}
+
+	return &ecdsaPublicKey{key: pubKey}, nil
 }

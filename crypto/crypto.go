@@ -15,32 +15,139 @@ import (
 	"golang.org/x/crypto/scrypt"
 )
 
-// Crypto defines the interface for cryptographic operations.
-type Crypto interface {
-	// GenerateKeyPair generates a new key pair of the specified type.
-	// If no key type is specified, it generates an Ed25519 key pair by default.
-	GenerateKeyPair(keyType KeyType) (PrivateKey, PublicKey, error)
+// GenerateKeyPair generates a new key pair of the specified type.
+// If no key type is specified, it generates an Ed25519 key pair by default.
+func GenerateKeyPair(keyType string) ([]byte, []byte, error) {
+	algorithm, err := algorithmFactory(keyType)
+	if err != nil {
+		return nil, nil, err
+	}
+	return algorithm.GenerateKeyPair()
+}
 
-	// Sign signs data with the given private key bytes.
-	Sign(data []byte, privateKey []byte, keyType KeyType) ([]byte, error)
+// Sign signs data with the given private key bytes.
+func Sign(data []byte, privateKey []byte, keyType string) ([]byte, error) {
+	algorithm, err := algorithmFactory(keyType)
+	if err != nil {
+		return nil, err
+	}
 
-	// Verify verifies a signature with the given public key bytes.
-	Verify(data []byte, signature []byte, publicKey []byte, keyType KeyType) bool
+	return algorithm.Sign(data, privateKey)
+}
 
-	// Hash computes the hash of the given data.
-	Hash(data []byte) types.Hash
+// Verify verifies a signature with the given public key bytes.
+func Verify(data []byte, signature []byte, publicKey []byte, keyType string) bool {
+	algorithm, err := algorithmFactory(keyType)
+	if err != nil {
+		return false
+	}
 
-	// GenerateAddress generates an address from the given public key bytes.
-	GenerateAddress(publicKey []byte, keyType KeyType) types.Address
+	return algorithm.Verify(data, signature, publicKey)
+}
 
-	// GenerateRandomBytes generates cryptographically secure random bytes.
-	GenerateRandomBytes(length int) ([]byte, error)
+// Hash computes the SHA256 hash of the given data.
+func Hash(data []byte) types.Hash {
+	hash := sha256.Sum256(data)
+	return types.Hash(hash)
+}
 
-	// EncryptConfig encrypts configuration data.
-	EncryptConfig(data []byte, password string) ([]byte, error)
+// GenerateAddress generates an address from the given public key bytes.
+func GenerateAddress(publicKey []byte, keyType string) types.Address {
+	algorithm, err := algorithmFactory(keyType)
+	if err != nil {
+		return types.Address{}
+	}
 
-	// DecryptConfig decrypts configuration data.
-	DecryptConfig(encryptedData []byte, password string) ([]byte, error)
+	return algorithm.GenerateAddress(publicKey)
+}
+
+// GenerateRandomBytes generates cryptographically secure random bytes.
+func GenerateRandomBytes(length int) ([]byte, error) {
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+	return bytes, nil
+}
+
+// EncryptConfig encrypts configuration data.
+func EncryptConfig(data []byte, password string) ([]byte, error) {
+	// Generate a random salt
+	salt := make([]byte, 32)
+	if _, err := rand.Read(salt); err != nil {
+		return nil, fmt.Errorf("failed to generate salt: %w", err)
+	}
+
+	// Derive key from password
+	key, err := deriveKey(password, salt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive key: %w", err)
+	}
+
+	// Encrypt data
+	ciphertext, nonce, err := encryptData(data, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt data: %w", err)
+	}
+
+	// Combine salt, nonce, and ciphertext
+	result := make([]byte, 0, len(salt)+len(nonce)+len(ciphertext))
+	result = append(result, salt...)
+	result = append(result, nonce...)
+	result = append(result, ciphertext...)
+
+	return result, nil
+}
+
+// DecryptConfig decrypts configuration data.
+func DecryptConfig(encryptedData []byte, password string) ([]byte, error) {
+	// Extract salt, nonce, and ciphertext
+	if len(encryptedData) < 32+12 {
+		return nil, fmt.Errorf("encrypted data is too short")
+	}
+
+	salt := encryptedData[:32]
+	nonce := encryptedData[32:44]
+	ciphertext := encryptedData[44:]
+
+	// Derive key from password and salt
+	key, err := deriveKey(password, salt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive key: %w", err)
+	}
+
+	// Decrypt data
+	plaintext, err := decryptData(ciphertext, nonce, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt data: %w", err)
+	}
+
+	return plaintext, nil
+}
+
+// Algorithm 定义了统一的密码学算法接口
+type Algorithm interface {
+	// GenerateKeyPair 生成新的密钥对，直接返回私钥和公钥的字节
+	GenerateKeyPair() (privateKey []byte, publicKey []byte, error error)
+
+	// Sign 使用私钥对数据进行签名
+	Sign(data []byte, privateKey []byte) ([]byte, error)
+
+	// Verify 使用公钥验证签名
+	Verify(data []byte, signature []byte, publicKey []byte) bool
+
+	// GenerateAddress 从公钥生成地址
+	GenerateAddress(publicKey []byte) types.Address
+
+	// Type 返回算法类型
+	Type() string
+
+	// PrivateKeyFromBytes 从字节数据创建私钥
+	PrivateKeyFromBytes(data []byte) (PrivateKey, error)
+
+	// PublicKeyFromBytes 从字节数据创建公钥
+	PublicKeyFromBytes(data []byte) (PublicKey, error)
 }
 
 // PrivateKey represents a private key interface.
@@ -55,10 +162,7 @@ type PrivateKey interface {
 	Sign(data []byte) ([]byte, error)
 
 	// Type returns the type of the private key.
-	Type() KeyType
-
-	// FromBytes creates a private key from bytes.
-	FromBytes(data []byte) (PrivateKey, error)
+	Type() string
 }
 
 // PublicKey represents a public key interface.
@@ -73,37 +177,31 @@ type PublicKey interface {
 	Verify(data []byte, signature []byte) bool
 
 	// Type returns the type of the public key.
-	Type() KeyType
-
-	// FromBytes creates a public key from bytes.
-	FromBytes(data []byte) (PublicKey, error)
+	Type() string
 }
-
-// KeyType represents the type of cryptographic key.
-type KeyType string
 
 const (
 	// Ed25519 key type
-	Ed25519 KeyType = "ed25519"
+	Ed25519 = "ed25519"
 	// ECDSA key type
-	ECDSA KeyType = "ecdsa"
+	ECDSA = "ecdsa"
 	// Secp256k1 key type
-	Secp256k1 KeyType = "secp256k1"
+	Secp256k1 = "secp256k1"
 	// Schnorr key type
-	Schnorr KeyType = "schnorr"
+	Schnorr = "schnorr"
 )
 
 // KeyFile represents the structure of a saved key file.
 type KeyFile struct {
-	Type       KeyType `json:"type"`
-	PublicKey  []byte  `json:"public_key"`
-	PrivateKey []byte  `json:"private_key"`
+	Type       string `json:"type"`
+	PublicKey  []byte `json:"public_key"`
+	PrivateKey []byte `json:"private_key"`
 }
 
 // EncryptedKeyFile represents the structure of an encrypted saved key file.
 type EncryptedKeyFile struct {
-	Type      KeyType `json:"type"`
-	PublicKey []byte  `json:"public_key"`
+	Type      string `json:"type"`
+	PublicKey []byte `json:"public_key"`
 	// EncryptedPrivateKey is the AES-GCM encrypted private key
 	EncryptedPrivateKey []byte `json:"encrypted_private_key"`
 	// Salt used for key derivation
@@ -112,77 +210,33 @@ type EncryptedKeyFile struct {
 	Nonce []byte `json:"nonce"`
 }
 
-// DefaultCrypto implements the Crypto interface.
-type DefaultCrypto struct{}
+// algorithmRegistry 算法注册表
+var algorithmRegistry = make(map[string]Algorithm)
 
-// GenerateKeyPair generates a new key pair of the specified type.
-func (c *DefaultCrypto) GenerateKeyPair(keyType KeyType) (PrivateKey, PublicKey, error) {
-	switch keyType {
-	case Ed25519:
-		return GenerateEd25519KeyPair()
-	case ECDSA:
-		return GenerateECDSAKeyPair()
-	case Secp256k1:
-		return GenerateSecp256k1KeyPair()
-	case Schnorr:
-		return GenerateSchnorrKeyPair()
-	default:
-		return nil, nil, fmt.Errorf("unsupported key type: %s", keyType)
+// RegisterAlgorithm 注册算法
+func RegisterAlgorithm(algorithm Algorithm) error {
+	if algorithm == nil {
+		return fmt.Errorf("algorithm cannot be nil")
 	}
+	keyType := algorithm.Type()
+	if _, exists := algorithmRegistry[keyType]; exists {
+		return fmt.Errorf("algorithm for key type %s already registered", keyType)
+	}
+	algorithmRegistry[keyType] = algorithm
+	return nil
 }
 
-// Sign signs data with the given private key bytes.
-func (c *DefaultCrypto) Sign(data []byte, privateKey []byte, keyType KeyType) ([]byte, error) {
-	// Create a temporary private key object from bytes to use existing implementation
-	priv, _, err := c.GenerateKeyPair(keyType)
-	if err != nil {
-		return nil, err
+// algorithmFactory 创建算法实例的工厂
+func algorithmFactory(keyType string) (Algorithm, error) {
+	if algorithm, exists := algorithmRegistry[keyType]; exists {
+		return algorithm, nil
 	}
-
-	privKey, err := priv.FromBytes(privateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return privKey.Sign(data)
+	return nil, fmt.Errorf("unsupported key type: %s", keyType)
 }
 
-// Verify verifies a signature with the given public key bytes.
-func (c *DefaultCrypto) Verify(data []byte, signature []byte, publicKey []byte, keyType KeyType) bool {
-	// Create a temporary public key object from bytes to use existing implementation
-	_, pub, err := c.GenerateKeyPair(keyType)
-	if err != nil {
-		return false
-	}
-
-	pubKey, err := pub.FromBytes(publicKey)
-	if err != nil {
-		return false
-	}
-
-	return pubKey.Verify(data, signature)
-}
-
-// Hash computes the SHA256 hash of the given data.
-func (c *DefaultCrypto) Hash(data []byte) types.Hash {
-	hash := sha256.Sum256(data)
-	return types.Hash(hash)
-}
-
-// GenerateAddress generates an address from the given public key bytes.
-func (c *DefaultCrypto) GenerateAddress(publicKey []byte, keyType KeyType) types.Address {
-	// Create a temporary public key object from bytes to use existing implementation
-	_, pub, err := c.GenerateKeyPair(keyType)
-	if err != nil {
-		return types.Address{}
-	}
-
-	pubKey, err := pub.FromBytes(publicKey)
-	if err != nil {
-		return types.Address{}
-	}
-
-	return pubKey.Address()
+// AlgorithmFactory creates an algorithm instance by key type
+func AlgorithmFactory(keyType string) (Algorithm, error) {
+	return algorithmFactory(keyType)
 }
 
 // deriveKey derives a 32-byte key from a password using scrypt
@@ -323,79 +377,10 @@ func LoadFromFile(filename string, password string) (PrivateKey, error) {
 	}
 
 	// Recreate the private key based on its type
-	priv, _, err := NewCrypto().GenerateKeyPair(encryptedKeyFile.Type)
+	algorithm, err := algorithmFactory(encryptedKeyFile.Type)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate %s private key: %w", encryptedKeyFile.Type, err)
-	}
-	return priv.FromBytes(privateKeyBytes)
-}
-
-// GenerateRandomBytes generates cryptographically secure random bytes.
-func (c *DefaultCrypto) GenerateRandomBytes(length int) ([]byte, error) {
-	bytes := make([]byte, length)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate random bytes: %w", err)
-	}
-	return bytes, nil
-}
-
-// EncryptConfig encrypts configuration data.
-func (c *DefaultCrypto) EncryptConfig(data []byte, password string) ([]byte, error) {
-	// Generate a random salt
-	salt := make([]byte, 32)
-	if _, err := rand.Read(salt); err != nil {
-		return nil, fmt.Errorf("failed to generate salt: %w", err)
+		return nil, fmt.Errorf("failed to get algorithm for %s: %w", encryptedKeyFile.Type, err)
 	}
 
-	// Derive key from password
-	key, err := deriveKey(password, salt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive key: %w", err)
-	}
-
-	// Encrypt data
-	ciphertext, nonce, err := encryptData(data, key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encrypt data: %w", err)
-	}
-
-	// Combine salt, nonce, and ciphertext
-	result := make([]byte, 0, len(salt)+len(nonce)+len(ciphertext))
-	result = append(result, salt...)
-	result = append(result, nonce...)
-	result = append(result, ciphertext...)
-
-	return result, nil
-}
-
-// DecryptConfig decrypts configuration data.
-func (c *DefaultCrypto) DecryptConfig(encryptedData []byte, password string) ([]byte, error) {
-	// Extract salt, nonce, and ciphertext
-	if len(encryptedData) < 32+12 {
-		return nil, fmt.Errorf("encrypted data is too short")
-	}
-
-	salt := encryptedData[:32]
-	nonce := encryptedData[32:44]
-	ciphertext := encryptedData[44:]
-
-	// Derive key from password and salt
-	key, err := deriveKey(password, salt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive key: %w", err)
-	}
-
-	// Decrypt data
-	plaintext, err := decryptData(ciphertext, nonce, key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt data: %w", err)
-	}
-
-	return plaintext, nil
-}
-
-// NewCrypto creates a new instance of the default crypto implementation.
-func NewCrypto() Crypto {
-	return &DefaultCrypto{}
+	return algorithm.PrivateKeyFromBytes(privateKeyBytes)
 }
