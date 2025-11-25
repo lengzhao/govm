@@ -302,12 +302,11 @@ func TestTransactionPackagingIntoBlock(t *testing.T) {
 	assert.Equal(t, 2, len(block.Transactions), "生成的区块应该包含2个交易哈希")
 
 	// 验证交易哈希是否正确计算
-	cryptoModule := crypto.NewCrypto()
 	for i, tx := range selectedTransactions {
 		// 序列化交易以计算哈希
 		data, err := lzbinary.Marshal(tx)
 		assert.NoError(t, err)
-		expectedHash := cryptoModule.Hash(data)
+		expectedHash := crypto.Hash(data)
 		assert.Equal(t, expectedHash, block.Transactions[i], "交易哈希应该正确计算")
 	}
 

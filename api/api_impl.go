@@ -22,7 +22,6 @@ type DefaultAPI struct {
 	txPool  txpool.TxPool
 	storage storage.Storage
 	network network.NetworkInterface
-	crypto  crypto.Crypto
 
 	server *http.Server
 	port   string
@@ -35,7 +34,6 @@ func NewAPI(core core.Core, txPool txpool.TxPool, storage storage.Storage, netwo
 		txPool:  txPool,
 		storage: storage,
 		network: network,
-		crypto:  crypto.NewCrypto(),
 		port:    ":8080", // 默认端口
 	}
 }
@@ -356,7 +354,7 @@ func (a *DefaultAPI) getLatestBlockHashHandler(w http.ResponseWriter, r *http.Re
 		http.Error(w, "failed to marshal block header", http.StatusInternalServerError)
 		return
 	}
-	blockHash := a.crypto.Hash(data)
+	blockHash := crypto.Hash(data)
 
 	// 返回区块哈希
 	response := map[string]interface{}{
@@ -408,7 +406,7 @@ func (a *DefaultAPI) SendTransaction(tx *types.Transaction) (types.Hash, error) 
 	if err != nil {
 		return types.Hash{}, fmt.Errorf("failed to marshal transaction: %w", err)
 	}
-	hash := a.crypto.Hash(data)
+	hash := crypto.Hash(data)
 
 	return hash, nil
 }
@@ -435,13 +433,13 @@ func (a *DefaultAPI) GetAccount(address types.Address) (*types.Account, error) {
 // CreateAccount 创建新账户
 func (a *DefaultAPI) CreateAccount() (types.Address, error) {
 	// 生成新的密钥对
-	_, pubKey, err := a.crypto.GenerateKeyPair(crypto.Ed25519)
+	_, pubKey, err := crypto.GenerateKeyPair(crypto.Ed25519)
 	if err != nil {
 		return types.Address{}, fmt.Errorf("failed to generate key pair: %w", err)
 	}
 
 	// 从公钥生成地址
-	address := a.crypto.GenerateAddress(pubKey.Bytes(), crypto.Ed25519)
+	address := crypto.GenerateAddress(pubKey, crypto.Ed25519)
 
 	// 保存私钥到文件（简化实现）
 	// 在实际应用中，应该安全地存储私钥

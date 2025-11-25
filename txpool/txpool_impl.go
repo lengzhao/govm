@@ -15,7 +15,6 @@ import (
 type DefaultTxPool struct {
 	core    core.Core
 	storage storage.Storage
-	crypto  crypto.Crypto
 
 	// 内存中的交易池
 	pendingTxs map[types.Hash]*types.TransactionWithSign
@@ -30,7 +29,6 @@ func NewTxPool(core core.Core, store storage.Storage) TxPool {
 	return &DefaultTxPool{
 		core:       core,
 		storage:    store,
-		crypto:     crypto.NewCrypto(),
 		pendingTxs: make(map[types.Hash]*types.TransactionWithSign),
 		running:    false,
 	}
@@ -184,7 +182,7 @@ func (tp *DefaultTxPool) calculateTransactionHash(tx *types.TransactionWithSign)
 		return types.Hash{} // 返回空哈希
 	}
 
-	return tp.crypto.Hash(data)
+	return crypto.Hash(data)
 }
 
 // storeTransaction 持久化交易到存储

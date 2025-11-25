@@ -384,3 +384,15 @@ func LoadFromFile(filename string, password string) (PrivateKey, error) {
 
 	return algorithm.PrivateKeyFromBytes(privateKeyBytes)
 }
+
+// ListAlgorithms returns a list of all registered algorithm names.
+func ListAlgorithms() []string {
+	algorithmNames := make([]string, 0, len(algorithmRegistry))
+
+	// Iterate through the algorithm registry and collect all algorithm names
+	for name := range algorithmRegistry {
+		algorithmNames = append(algorithmNames, name)
+	}
+
+	return algorithmNames
+}

@@ -37,6 +37,14 @@ valid := crypto.Verify(data, signature, publicKey, keyType)
 address := crypto.GenerateAddress(publicKey, keyType)
 ```
 
+## List Available Algorithms
+
+```go
+// Get a list of all available algorithm names
+algorithms := crypto.ListAlgorithms()
+fmt.Println("Available algorithms:", algorithms)
+```
+
 ## Key Serialization
 
 Keys can be serialized and deserialized through the Algorithm interface:
@@ -137,6 +145,10 @@ func main() {
     // Hash data
     hash := crypto.Hash(data)
     fmt.Printf("SHA256 Hash: %x\n", hash)
+    
+    // List available algorithms
+    algorithms := crypto.ListAlgorithms()
+    fmt.Println("Available algorithms:", algorithms)
 }
 ```
 
@@ -205,6 +217,7 @@ func Sign(data []byte, privateKey []byte, keyType string) ([]byte, error)
 func Verify(data []byte, signature []byte, publicKey []byte, keyType string) bool
 func GenerateAddress(publicKey []byte, keyType string) types.Address
 func Hash(data []byte) types.Hash
+func ListAlgorithms() []string
 ```
 
 ### Algorithm Interface

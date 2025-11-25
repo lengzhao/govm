@@ -77,7 +77,6 @@ type PoAConsensus interface {
 type DefaultPoA struct {
 	config  *PoAConfig
 	state   *ConsensusState
-	crypto  crypto.Crypto
 	storage storage.Storage // 添加存储实例
 }
 
@@ -96,7 +95,6 @@ func NewPoAConsensus(config *PoAConfig, storage storage.Storage) PoAConsensus {
 			Validators:    make([]ValidatorInfo, len(config.Validators)),
 			LastBlockTime: 0,
 		},
-		crypto:  crypto.NewCrypto(),
 		storage: vs, // validator storage
 	}
 }
@@ -193,13 +191,13 @@ func (p *DefaultPoA) verifyBlockSignature(block *types.Block) error {
 	// 获取验证者的公钥
 	// 注意：这是一个简化的实现，在实际应用中，我们需要从验证者的地址推导出公钥
 	// 或者区块中直接包含公钥信息。这里我们创建一个新的密钥对仅用于演示
-	_, pubKey, err := p.crypto.GenerateKeyPair(crypto.Ed25519)
+	_, pubKey, err := crypto.GenerateKeyPair(crypto.Ed25519)
 	if err != nil {
 		return fmt.Errorf("failed to generate key pair: %w", err)
 	}
 
-	// 验证签名 (修改为使用新的接口)
-	if !p.crypto.Verify(data, block.Header.Signature, pubKey.Bytes(), crypto.Ed25519) {
+	// 验证签名
+	if !crypto.Verify(data, block.Header.Signature, pubKey, crypto.Ed25519) {
 		return fmt.Errorf("invalid block signature")
 	}
 

@@ -16,7 +16,6 @@ import (
 type Blockchain struct {
 	storage   storage.Storage
 	consensus consensus.PoAConsensus
-	crypto    crypto.Crypto
 
 	// 区块链状态
 	lastBlock     *types.Block
@@ -35,7 +34,6 @@ func NewBlockchain(storage storage.Storage, consensus consensus.PoAConsensus) *B
 	return &Blockchain{
 		storage:   storage,
 		consensus: consensus,
-		crypto:    crypto.NewCrypto(),
 		height:    0,
 	}
 }
@@ -241,7 +239,7 @@ func (bc *Blockchain) calculateBlockHash(block *types.Block) types.Hash {
 		return types.Hash{}
 	}
 
-	return bc.crypto.Hash(data)
+	return crypto.Hash(data)
 }
 
 // CalculateBlockHash 公共方法计算区块哈希

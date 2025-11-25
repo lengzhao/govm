@@ -57,4 +57,18 @@ func main() {
 	// 生成地址
 	address := pubKey.Address()
 	fmt.Printf("Generated address: %x\n", address)
+
+	// Demonstrate the new ListAlgorithms function
+	fmt.Println("\n--- Demonstrating ListAlgorithms function ---")
+	listAlgorithmsDemo()
+}
+
+func listAlgorithmsDemo() {
+	// List all available algorithms
+	algorithms := crypto.ListAlgorithms()
+
+	fmt.Println("Available algorithms:")
+	for _, algorithm := range algorithms {
+		fmt.Printf("- %s\n", algorithm)
+	}
 }

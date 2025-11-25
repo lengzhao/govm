@@ -1185,3 +1185,30 @@ func TestAddressUniquenessAcrossAlgorithms(t *testing.T) {
 		}
 	}
 }
+
+// Test ListAlgorithms function
+func TestListAlgorithms(t *testing.T) {
+	// Get the list of algorithms
+	algorithms := ListAlgorithms()
+
+	// Check that we have at least the expected algorithms
+	expectedAlgorithms := []string{Ed25519, ECDSA, Secp256k1, Schnorr}
+
+	// Create a map for easy lookup
+	algorithmMap := make(map[string]bool)
+	for _, alg := range algorithms {
+		algorithmMap[alg] = true
+	}
+
+	// Check that all expected algorithms are present
+	for _, expected := range expectedAlgorithms {
+		if !algorithmMap[expected] {
+			t.Errorf("Expected algorithm %s not found in list", expected)
+		}
+	}
+
+	// Check that the list is not empty
+	if len(algorithms) == 0 {
+		t.Error("List of algorithms should not be empty")
+	}
+}

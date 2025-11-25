@@ -38,14 +38,12 @@ type TxProcessor interface {
 
 // DefaultTxProcessor 默认交易处理器实现
 type DefaultTxProcessor struct {
-	crypto  crypto.Crypto
 	storage storage.Storage
 }
 
 // NewTxProcessor 创建新的交易处理器
 func NewTxProcessor(store storage.Storage) TxProcessor {
 	return &DefaultTxProcessor{
-		crypto:  crypto.NewCrypto(),
 		storage: store,
 	}
 }
@@ -89,7 +87,7 @@ func (tp *DefaultTxProcessor) verifyTransactionSignature(tx *types.Transaction, 
 	}
 
 	// 验证签名 (修改为使用新的接口)
-	if !tp.crypto.Verify(data, signature, tx.PublicKey, crypto.Ed25519) {
+	if !crypto.Verify(data, signature, tx.PublicKey, crypto.Ed25519) {
 		return fmt.Errorf("invalid transaction signature")
 	}
 
@@ -337,7 +335,7 @@ func (tp *DefaultTxProcessor) calculateTransactionHash(tx *types.TransactionWith
 		return types.Hash{} // 返回空哈希
 	}
 
-	return tp.crypto.Hash(data)
+	return crypto.Hash(data)
 }
 
 // calculateGasFee 计算交易的Gas费用

@@ -9,7 +9,6 @@ import (
 type MerkleTree struct {
 	Root   *MerkleNode
 	Leaves []*MerkleNode
-	crypto crypto.Crypto
 }
 
 // MerkleNode Merkle树节点
@@ -25,7 +24,6 @@ func NewMerkleTree(data []types.Hash) *MerkleTree {
 		return &MerkleTree{
 			Root:   &MerkleNode{Hash: types.Hash{}},
 			Leaves: []*MerkleNode{},
-			crypto: crypto.NewCrypto(),
 		}
 	}
 
@@ -61,7 +59,6 @@ func NewMerkleTree(data []types.Hash) *MerkleTree {
 	return &MerkleTree{
 		Root:   nodes[0],
 		Leaves: leaves,
-		crypto: crypto.NewCrypto(),
 	}
 }
 
@@ -79,6 +76,5 @@ func combineAndHash(left, right types.Hash) types.Hash {
 	copy(combined[:len(left)], left[:])
 	copy(combined[len(left):], right[:])
 
-	cryptoInstance := crypto.NewCrypto()
-	return cryptoInstance.Hash(combined)
+	return crypto.Hash(combined)
 }

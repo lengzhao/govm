@@ -149,9 +149,7 @@ func TestBlockValidation(t *testing.T) {
 	// 创建PoA共识实例
 	poa := NewPoAConsensus(config, store)
 
-	// 创建一个有效的区块
-	cryptoInstance := crypto.NewCrypto()
-	privKey, _, err := cryptoInstance.GenerateKeyPair(crypto.Ed25519)
+	privKey, _, err := crypto.GenerateKeyPair(crypto.Ed25519)
 	assert.NoError(t, err)
 
 	// 创建区块头
@@ -170,7 +168,7 @@ func TestBlockValidation(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 签名区块头
-	signature, err := cryptoInstance.Sign(data, privKey.Bytes(), crypto.Ed25519)
+	signature, err := crypto.Sign(data, privKey, crypto.Ed25519)
 	assert.NoError(t, err)
 
 	header2 := &types.BlockHeaderWithSign{

@@ -41,7 +41,6 @@ type BlockGenerator interface {
 type DefaultBlockGenerator struct {
 	consensus consensus.PoAConsensus
 	storage   storage.Storage
-	crypto    crypto.Crypto
 	txPool    txpool.TxPool // 添加交易池引用
 }
 
@@ -50,7 +49,6 @@ func NewBlockGenerator(cons consensus.PoAConsensus, store storage.Storage, txPoo
 	return &DefaultBlockGenerator{
 		consensus: cons,
 		storage:   store,
-		crypto:    crypto.NewCrypto(),
 		txPool:    txPool, // 初始化交易池
 	}
 }
@@ -160,7 +158,7 @@ func (bg *DefaultBlockGenerator) AssembleBlock(header *types.BlockHeader, transa
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal transaction: %w", err)
 		}
-		txHashes[i] = bg.crypto.Hash(data)
+		txHashes[i] = crypto.Hash(data)
 	}
 
 	// 创建区块头（带签名）
@@ -190,7 +188,7 @@ func (bg *DefaultBlockGenerator) SignBlock(block *types.Block) error {
 
 	// 获取当前验证者的私钥
 	// 简化实现：使用测试私钥
-	privKey, _, err := bg.crypto.GenerateKeyPair(crypto.Ed25519)
+	privKey, _, err := crypto.GenerateKeyPair(crypto.Ed25519)
 	if err != nil {
 		return fmt.Errorf("failed to generate key pair: %w", err)
 	}
@@ -205,7 +203,7 @@ func (bg *DefaultBlockGenerator) SignBlock(block *types.Block) error {
 	}
 
 	// 对区块头进行签名
-	signature, err := bg.crypto.Sign(data, privKey.Bytes(), crypto.Ed25519)
+	signature, err := crypto.Sign(data, privKey, crypto.Ed25519)
 	if err != nil {
 		return fmt.Errorf("failed to sign block: %w", err)
 	}
@@ -302,7 +300,7 @@ func (bg *DefaultBlockGenerator) calculateMerkleRoot(transactions []*types.Trans
 		if err != nil {
 			return types.Hash{} // 出错时返回空哈希
 		}
-		hashes[i] = bg.crypto.Hash(data)
+		hashes[i] = crypto.Hash(data)
 	}
 
 	// 构建Merkle树并返回根哈希

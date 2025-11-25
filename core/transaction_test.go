@@ -21,8 +21,7 @@ func TestTxProcessor_ValidateTransaction(t *testing.T) {
 	txProcessor := NewTxProcessor(store)
 
 	// 生成测试密钥对
-	cryptoInstance := crypto.NewCrypto()
-	privKey, pubKey, err := cryptoInstance.GenerateKeyPair(crypto.Ed25519)
+	privKey, pubKey, err := crypto.GenerateKeyPair(crypto.Ed25519)
 	assert.NoError(t, err)
 
 	// 创建交易数据
@@ -36,7 +35,7 @@ func TestTxProcessor_ValidateTransaction(t *testing.T) {
 		GasPrice:  1,
 		GasLimit:  21000,
 		GasFeeCap: 1000,
-		PublicKey: pubKey.Bytes(),
+		PublicKey: pubKey,
 	}
 
 	// 序列化交易数据用于签名
@@ -44,7 +43,7 @@ func TestTxProcessor_ValidateTransaction(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 签名交易数据
-	signature, err := cryptoInstance.Sign(data, privKey.Bytes(), crypto.Ed25519)
+	signature, err := crypto.Sign(data, privKey, crypto.Ed25519)
 	assert.NoError(t, err)
 
 	// 创建有效的交易
@@ -68,7 +67,7 @@ func TestTxProcessor_ValidateTransaction(t *testing.T) {
 		GasPrice:  1,
 		GasLimit:  21000,
 		GasFeeCap: 1000,
-		PublicKey: pubKey.Bytes(),
+		PublicKey: pubKey,
 	}
 
 	// 序列化交易数据用于签名
@@ -76,7 +75,7 @@ func TestTxProcessor_ValidateTransaction(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 签名交易数据
-	invalidSignature1, err := cryptoInstance.Sign(invalidData1, privKey.Bytes(), crypto.Ed25519)
+	invalidSignature1, err := crypto.Sign(invalidData1, privKey, crypto.Ed25519)
 	assert.NoError(t, err)
 
 	invalidTx1 := &types.TransactionWithSign{
@@ -99,7 +98,7 @@ func TestTxProcessor_ValidateTransaction(t *testing.T) {
 		GasPrice:  1,
 		GasLimit:  21000,
 		GasFeeCap: 1000,
-		PublicKey: pubKey.Bytes(),
+		PublicKey: pubKey,
 	}
 
 	// 序列化交易数据用于签名
@@ -107,7 +106,7 @@ func TestTxProcessor_ValidateTransaction(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 签名交易数据
-	invalidSignature2, err := cryptoInstance.Sign(invalidData2, privKey.Bytes(), crypto.Ed25519)
+	invalidSignature2, err := crypto.Sign(invalidData2, privKey, crypto.Ed25519)
 	assert.NoError(t, err)
 
 	invalidTx2 := &types.TransactionWithSign{
@@ -138,7 +137,7 @@ func TestTxProcessor_ValidateTransaction(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 签名交易数据
-	invalidSignature3, err := cryptoInstance.Sign(invalidData3, privKey.Bytes(), crypto.Ed25519)
+	invalidSignature3, err := crypto.Sign(invalidData3, privKey, crypto.Ed25519)
 	assert.NoError(t, err)
 
 	invalidTx3 := &types.TransactionWithSign{
@@ -164,8 +163,7 @@ func TestTxProcessor_ApplyTransaction(t *testing.T) {
 	txProcessor := NewTxProcessor(store)
 
 	// 生成测试密钥对
-	cryptoInstance := crypto.NewCrypto()
-	privKey, pubKey, err := cryptoInstance.GenerateKeyPair(crypto.Ed25519)
+	privKey, pubKey, err := crypto.GenerateKeyPair(crypto.Ed25519)
 	assert.NoError(t, err)
 
 	// 创建发送方和接收方地址
@@ -189,7 +187,7 @@ func TestTxProcessor_ApplyTransaction(t *testing.T) {
 		GasPrice:  1,
 		GasLimit:  21000,
 		GasFeeCap: 1000,
-		PublicKey: pubKey.Bytes(),
+		PublicKey: pubKey,
 	}
 
 	// 序列化交易数据用于签名
@@ -197,7 +195,7 @@ func TestTxProcessor_ApplyTransaction(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 签名交易数据
-	signature, err := cryptoInstance.Sign(data, privKey.Bytes(), crypto.Ed25519)
+	signature, err := crypto.Sign(data, privKey, crypto.Ed25519)
 	assert.NoError(t, err)
 
 	// 创建交易
