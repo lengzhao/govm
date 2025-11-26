@@ -36,3 +36,4 @@ govm
 node*/
 config/
 *.log
+*.key

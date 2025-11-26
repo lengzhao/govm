@@ -46,6 +46,12 @@ type API interface {
 
 	// SetPort 设置API服务端口
 	SetPort(port string)
+
+	// WalletAPI 获取钱包API接口
+	WalletAPI() WalletAPI
+
+	// AdminAPI 获取管理API接口
+	AdminAPI() AdminAPI
 }
 
 // WalletAPI 钱包API接口
@@ -60,7 +66,7 @@ type WalletAPI interface {
 	ExportAccount(address types.Address) ([]byte, error)
 
 	// SignTransaction 签名交易
-	SignTransaction(tx *types.Transaction, address types.Address) (*types.Transaction, error)
+	SignTransaction(tx *types.Transaction, address types.Address) (*types.TransactionWithSign, error)
 
 	// GetAccounts 获取账户列表
 	GetAccounts() ([]types.Address, error)
